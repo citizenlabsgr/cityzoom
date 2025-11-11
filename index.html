@@ -25,14 +25,13 @@
         top: 0;
         left: 0;
         right: 0;
-        height: 60px;
+        height: 45px;
         background: rgba(0, 0, 0, 0.9);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 20px;
+        padding: 5px 20px;
         z-index: 1000;
-        border-bottom: 2px solid #333;
       }
       #header h1 {
         color: white;
@@ -86,30 +85,30 @@
       /* Styles for screens with width greater than height (landscape) */
       @media (min-aspect-ratio: 1/1) {
         #map1 {
-          height: calc(100vh - 120px);
+          height: calc(100vh - 85px);
           width: 50%;
           float: left;
           border-right-width: 0;
-          margin-top: 60px;
+          margin-top: 45px;
         }
         #map2 {
-          height: calc(100vh - 120px);
+          height: calc(100vh - 85px);
           width: 50%;
           float: left;
           border-left-width: 10px;
-          margin-top: 60px;
+          margin-top: 45px;
         }
       }
       /* Styles for screens with height greater than width (portrait) */
       @media (max-aspect-ratio: 1/1) {
         #map1 {
-          height: calc((100vh - 120px) / 2);
+          height: calc((100vh - 85px) / 2);
           width: 100%;
           border-bottom-width: 0;
-          margin-top: 60px;
+          margin-top: 45px;
         }
         #map2 {
-          height: calc((100vh - 120px) / 2);
+          height: calc((100vh - 85px) / 2);
           width: 100%;
           border-top-width: 10px;
         }
@@ -119,13 +118,12 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: 60px;
-        line-height: 60px;
+        height: 40px;
+        line-height: 40px;
         background: rgba(0, 0, 0, 0.9);
         padding: 0 20px;
         text-align: center;
         z-index: 1000;
-        border-top: 2px solid #333;
         font-size: 14px;
         color: #888;
       }
