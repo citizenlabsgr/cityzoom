@@ -18,6 +18,7 @@
         height: 100%;
         margin: 0;
         background: black;
+        font-family: Arial, sans-serif;
       }
       #header {
         position: fixed;
@@ -36,14 +37,12 @@
       #header h1 {
         color: white;
         margin: 0;
-        font-family: Arial, sans-serif;
         font-size: 24px;
         font-weight: bold;
       }
       #header .tagline {
         color: #888;
         margin: 0;
-        font-family: Arial, sans-serif;
         font-size: 14px;
         font-weight: normal;
         position: absolute;
@@ -87,14 +86,14 @@
       /* Styles for screens with width greater than height (landscape) */
       @media (min-aspect-ratio: 1/1) {
         #map1 {
-          height: calc(100% - 60px);
+          height: calc(100vh - 120px);
           width: 50%;
           float: left;
           border-right-width: 0;
           margin-top: 60px;
         }
         #map2 {
-          height: calc(100% - 60px);
+          height: calc(100vh - 120px);
           width: 50%;
           float: left;
           border-left-width: 10px;
@@ -104,16 +103,41 @@
       /* Styles for screens with height greater than width (portrait) */
       @media (max-aspect-ratio: 1/1) {
         #map1 {
-          height: calc(50% - 30px);
+          height: calc((100vh - 120px) / 2);
           width: 100%;
           border-bottom-width: 0;
           margin-top: 60px;
         }
         #map2 {
-          height: calc(50% - 30px);
+          height: calc((100vh - 120px) / 2);
           width: 100%;
           border-top-width: 10px;
         }
+      }
+      #footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        line-height: 60px;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 0 20px;
+        text-align: center;
+        z-index: 1000;
+        border-top: 2px solid #333;
+        font-size: 14px;
+        color: #888;
+      }
+      #footer a {
+        color: #888;
+        text-decoration: none;
+      }
+      #footer a:hover {
+        color: #aaa;
+      }
+      #footer b {
+        color: #aaa;
       }
     </style>
   </head>
@@ -272,5 +296,8 @@
         map2.setView(e.location, 13);
       });
     </script>
+    <div id="footer">
+      <a href="https://cityzoom.link"><b>City Zoom</b></a> is an <a href="https://github.com/citizenlabsgr/cityzoom" target="_blank"><b>open source</b></a> project by <a href="https://citizenlabs.org/" target="_blank"><b>Citizen Labs</b></a>.
+    </div>
   </body>
 </html>
