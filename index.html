@@ -19,6 +19,66 @@
         margin: 0;
         background: black;
       }
+      #header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        z-index: 1000;
+        border-bottom: 2px solid #333;
+      }
+      #header h1 {
+        color: white;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        font-size: 24px;
+        font-weight: bold;
+      }
+      #header .tagline {
+        color: #888;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: normal;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      @media (max-width: 768px) {
+        #header .tagline {
+          display: none;
+        }
+      }
+      #header .header-left {
+        display: flex;
+        align-items: center;
+      }
+      #copyButton {
+        background: black;
+        color: white;
+        border: 2px solid white;
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: Arial, sans-serif;
+        transition: background 0.3s, border-color 0.3s;
+      }
+      #copyButton:hover {
+        background: #333;
+      }
+      #copyButton:active {
+        background: #000;
+      }
+      #copyButton.copied {
+        background: #222;
+      }
       #map1,
       #map2 {
         box-sizing: border-box;
@@ -27,27 +87,30 @@
       /* Styles for screens with width greater than height (landscape) */
       @media (min-aspect-ratio: 1/1) {
         #map1 {
-          height: 100%;
+          height: calc(100% - 60px);
           width: 50%;
           float: left;
           border-right-width: 0;
+          margin-top: 60px;
         }
         #map2 {
-          height: 100%;
+          height: calc(100% - 60px);
           width: 50%;
           float: left;
           border-left-width: 10px;
+          margin-top: 60px;
         }
       }
       /* Styles for screens with height greater than width (portrait) */
       @media (max-aspect-ratio: 1/1) {
         #map1 {
-          height: 50%;
+          height: calc(50% - 30px);
           width: 100%;
           border-bottom-width: 0;
+          margin-top: 60px;
         }
         #map2 {
-          height: 50%;
+          height: calc(50% - 30px);
           width: 100%;
           border-top-width: 10px;
         }
@@ -55,6 +118,13 @@
     </style>
   </head>
   <body>
+    <div id="header">
+      <div class="header-left">
+        <h1>City Zoom</h1>
+      </div>
+      <span class="tagline">Compare two locations with synchronized zoom levels.</span>
+      <button id="copyButton" onclick="copyUrl()">Copy URL</button>
+    </div>
     <div id="map1"></div>
     <div id="map2"></div>
     <script>
@@ -77,6 +147,37 @@
         });
 
         history.pushState(null, "", "?" + params.toString());
+        dismissCopiedState();
+      }
+
+      function copyUrl() {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(function() {
+          const button = document.getElementById('copyButton');
+          button.textContent = 'Copied!';
+          button.classList.add('copied');
+          if (copyTimeout) {
+            clearTimeout(copyTimeout);
+          }
+          copyTimeout = setTimeout(function() {
+            dismissCopiedState();
+          }, 10000);
+        }).catch(function(err) {
+          console.error('Failed to copy URL:', err);
+          alert('Failed to copy URL. Please copy manually: ' + url);
+        });
+      }
+
+      function dismissCopiedState() {
+        const button = document.getElementById('copyButton');
+        if (button.classList.contains('copied')) {
+          button.textContent = originalButtonText;
+          button.classList.remove('copied');
+          if (copyTimeout) {
+            clearTimeout(copyTimeout);
+            copyTimeout = null;
+          }
+        }
       }
 
       // Get initial center coordinates and zoom levels
@@ -112,6 +213,11 @@
         attribution:
           '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map2);
+
+      // Initialize the copy button
+
+      let copyTimeout = null;
+      const originalButtonText = 'Copy URL';
 
       // Enable search
 
