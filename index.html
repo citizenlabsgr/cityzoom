@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <title>City Zoom</title>
@@ -66,7 +66,9 @@
         cursor: pointer;
         border-radius: 4px;
         font-family: Arial, sans-serif;
-        transition: background 0.3s, border-color 0.3s;
+        transition:
+          background 0.3s,
+          border-color 0.3s;
       }
       #copyButton:hover {
         background: #333;
@@ -174,27 +176,30 @@
 
       function copyUrl() {
         const url = window.location.href;
-        navigator.clipboard.writeText(url).then(function() {
-          const button = document.getElementById('copyButton');
-          button.textContent = 'Copied!';
-          button.classList.add('copied');
-          if (copyTimeout) {
-            clearTimeout(copyTimeout);
-          }
-          copyTimeout = setTimeout(function() {
-            dismissCopiedState();
-          }, 10000);
-        }).catch(function(err) {
-          console.error('Failed to copy URL:', err);
-          alert('Failed to copy URL. Please copy manually: ' + url);
-        });
+        navigator.clipboard
+          .writeText(url)
+          .then(function () {
+            const button = document.getElementById("copyButton");
+            button.textContent = "Copied!";
+            button.classList.add("copied");
+            if (copyTimeout) {
+              clearTimeout(copyTimeout);
+            }
+            copyTimeout = setTimeout(function () {
+              dismissCopiedState();
+            }, 10000);
+          })
+          .catch(function (err) {
+            console.error("Failed to copy URL:", err);
+            alert("Failed to copy URL. Please copy manually: " + url);
+          });
       }
 
       function dismissCopiedState() {
-        const button = document.getElementById('copyButton');
-        if (button.classList.contains('copied')) {
+        const button = document.getElementById("copyButton");
+        if (button.classList.contains("copied")) {
           button.textContent = originalButtonText;
-          button.classList.remove('copied');
+          button.classList.remove("copied");
           if (copyTimeout) {
             clearTimeout(copyTimeout);
             copyTimeout = null;
@@ -239,7 +244,7 @@
       // Initialize the copy button
 
       let copyTimeout = null;
-      const originalButtonText = 'Copy URL';
+      const originalButtonText = "Copy URL";
 
       // Enable search
 
@@ -270,7 +275,9 @@
           isZooming = true;
           syncZoom(map1.getZoom());
           syncMaps();
-          setTimeout(() => { isZooming = false; }, 100);
+          setTimeout(() => {
+            isZooming = false;
+          }, 100);
         }
       });
 
@@ -279,7 +286,9 @@
           isZooming = true;
           syncZoom(map2.getZoom());
           syncMaps();
-          setTimeout(() => { isZooming = false; }, 100);
+          setTimeout(() => {
+            isZooming = false;
+          }, 100);
         }
       });
 
@@ -295,7 +304,13 @@
       });
     </script>
     <div id="footer">
-      <a href="https://cityzoom.link"><b>City Zoom</b></a> is an <a href="https://github.com/citizenlabsgr/cityzoom" target="_blank"><b>open source</b></a> project by <a href="https://citizenlabs.org/" target="_blank"><b>Citizen Labs</b></a>.
+      <a href="https://cityzoom.link"><b>City Zoom</b></a> is an
+      <a href="https://github.com/citizenlabsgr/cityzoom" target="_blank"
+        ><b>open source</b></a
+      >
+      project by
+      <a href="https://citizenlabs.org/" target="_blank"><b>Citizen Labs</b></a
+      >.
     </div>
   </body>
 </html>
