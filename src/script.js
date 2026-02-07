@@ -461,14 +461,16 @@ function setLine(map, lineVar, latlngs) {
 
 let toastTimeout = null;
 
-function showToast(message) {
+function showToast(message, type) {
   const el = document.getElementById("toast");
   if (!el) return;
   el.textContent = message;
+  el.classList.remove("error");
+  if (type === "error") el.classList.add("error");
   el.classList.add("visible");
   if (toastTimeout) clearTimeout(toastTimeout);
   toastTimeout = setTimeout(function () {
-    el.classList.remove("visible");
+    el.classList.remove("visible", "error");
     toastTimeout = null;
   }, 3000);
 }
@@ -477,7 +479,7 @@ function applyFragmentToMaps() {
   const raw = window.location.hash.slice(1).trim();
   const { line1: pts1, line2: pts2 } = parseFragment();
   if (raw && !pts1 && !pts2) {
-    showToast("Invalid map annotations.");
+    showToast("Invalid map annotations.", "error");
     history.replaceState(null, "", window.location.pathname + window.location.search);
     return;
   }

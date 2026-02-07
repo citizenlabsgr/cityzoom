@@ -356,6 +356,12 @@ html {
   visibility: visible;
 }
 
+.toast.visible.error {
+  background: #c00;
+  color: #fff;
+  border-color: #a00;
+}
+
 #footer {
   position: fixed;
   bottom: 0;
