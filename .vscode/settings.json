@@ -4,6 +4,7 @@
     "linecap",
     "linejoin",
     "moveend",
+    "nodemon",
     "onclick",
     "showlocation",
     "stylesheet",
