@@ -54,12 +54,6 @@ html {
   border-color: #888;
 }
 
-@media (max-width: 768px) {
-  #header .tagline-wrap {
-    display: none;
-  }
-}
-
 #header .header-left {
   display: flex;
   align-items: center;
@@ -77,6 +71,12 @@ html {
 #header .tagline {
   position: static;
   transform: none;
+}
+
+@media (max-width: 768px) {
+  #header .tagline-wrap {
+    display: none !important;
+  }
 }
 
 #copyButton {
