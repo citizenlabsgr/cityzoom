@@ -57,6 +57,25 @@ test.describe("City Zoom", () => {
     await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
   });
 
+  test("second draw on same map preserves original line", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 250, y: 100 } });
+    await map1.click({ position: { x: 300, y: 220 } });
+    await page.keyboard.press("Escape");
+    const path = page.locator("#map1 path.leaflet-interactive").first();
+    await expect(path).toBeVisible();
+    const d = await path.getAttribute("d");
+    const lineSegments = (d.match(/L/g) || []).length;
+    expect(lineSegments).toBeGreaterThanOrEqual(3);
+  });
+
   test("Copy URL resets to Copy URL when drawing fragment changes", async ({
     page,
   }) => {

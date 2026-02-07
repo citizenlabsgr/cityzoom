@@ -396,6 +396,8 @@ let drawState = {
   previewLayer: null,
   segmentPreviewBorderLayer: null,
   segmentPreviewLayer: null,
+  connectionPreviewBorderLayer: null,
+  connectionPreviewLayer: null,
 };
 
 function startDraw(mapId) {
@@ -406,6 +408,8 @@ function startDraw(mapId) {
     previewLayer: null,
     segmentPreviewBorderLayer: null,
     segmentPreviewLayer: null,
+    connectionPreviewBorderLayer: null,
+    connectionPreviewLayer: null,
   };
   document.getElementById("drawBox1").classList.toggle("active", mapId === 1);
   document.getElementById("drawBox2").classList.toggle("active", mapId === 2);
@@ -424,11 +428,23 @@ function removeSegmentPreview(map) {
   }
 }
 
+function removeConnectionPreview(map) {
+  if (drawState.connectionPreviewBorderLayer) {
+    map.removeLayer(drawState.connectionPreviewBorderLayer);
+    drawState.connectionPreviewBorderLayer = null;
+  }
+  if (drawState.connectionPreviewLayer) {
+    map.removeLayer(drawState.connectionPreviewLayer);
+    drawState.connectionPreviewLayer = null;
+  }
+}
+
 function cancelDraw() {
   const map = drawState.mapId === 1 ? map1 : map2;
   if (drawState.previewBorderLayer) map.removeLayer(drawState.previewBorderLayer);
   if (drawState.previewLayer) map.removeLayer(drawState.previewLayer);
   removeSegmentPreview(map);
+  removeConnectionPreview(map);
   drawState = {
     mapId: null,
     points: [],
@@ -436,6 +452,8 @@ function cancelDraw() {
     previewLayer: null,
     segmentPreviewBorderLayer: null,
     segmentPreviewLayer: null,
+    connectionPreviewBorderLayer: null,
+    connectionPreviewLayer: null,
   };
   document.getElementById("drawBox1").classList.remove("active");
   document.getElementById("drawBox2").classList.remove("active");
@@ -449,30 +467,31 @@ function updatePreview(map, points) {
   if (points.length < 2) return;
   drawState.previewBorderLayer = L.polyline(points, {
     ...LINE_BORDER_STYLE,
-    dashArray: "5,5",
   }).addTo(map);
   drawState.previewLayer = L.polyline(points, {
     ...LINE_STYLE,
-    dashArray: "5,5",
   }).addTo(map);
 }
 
 function finishDraw(mapId) {
-  if (drawState.points.length < 2) {
+  const map = mapId === 1 ? map1 : map2;
+  const points = drawState.points.map((ll) => [ll.lat, ll.lng]);
+  const existing = mapId === 1 ? getLinePoints(line1) : getLinePoints(line2);
+  const combined = existing && existing.length >= 2 ? [...existing, ...points] : points;
+  if (combined.length < 2) {
     cancelDraw();
     return;
   }
-  const map = mapId === 1 ? map1 : map2;
   if (drawState.previewBorderLayer) map.removeLayer(drawState.previewBorderLayer);
   if (drawState.previewLayer) map.removeLayer(drawState.previewLayer);
   removeSegmentPreview(map);
-  const points = drawState.points.map((ll) => [ll.lat, ll.lng]);
+  removeConnectionPreview(map);
   if (mapId === 1) {
-    setLine(map1, "line1", points);
-    updateFragment(points, getLinePoints(line2));
+    setLine(map1, "line1", combined);
+    updateFragment(combined, getLinePoints(line2));
   } else {
-    setLine(map2, "line2", points);
-    updateFragment(getLinePoints(line1), points);
+    setLine(map2, "line2", combined);
+    updateFragment(getLinePoints(line1), combined);
   }
   drawState = {
     mapId: null,
@@ -481,6 +500,8 @@ function finishDraw(mapId) {
     previewLayer: null,
     segmentPreviewBorderLayer: null,
     segmentPreviewLayer: null,
+    connectionPreviewBorderLayer: null,
+    connectionPreviewLayer: null,
   };
   document.getElementById("drawBox1").classList.remove("active");
   document.getElementById("drawBox2").classList.remove("active");
@@ -491,26 +512,50 @@ function finishDraw(mapId) {
 
 document.addEventListener("keydown", function (e) {
   if (e.key !== "Escape" || !drawState.mapId) return;
-  if (drawState.points.length >= 2) finishDraw(drawState.mapId);
-  else cancelDraw();
+  finishDraw(drawState.mapId);
 });
 
 document.getElementById("drawBox1").addEventListener("click", function () {
-  if (drawState.mapId === 1) {
-    if (drawState.points.length >= 2) finishDraw(1);
-    else cancelDraw();
-  } else startDraw(1);
+  if (drawState.mapId === 1) finishDraw(1);
+  else startDraw(1);
 });
 document.getElementById("drawBox2").addEventListener("click", function () {
-  if (drawState.mapId === 2) {
-    if (drawState.points.length >= 2) finishDraw(2);
-    else cancelDraw();
-  } else startDraw(2);
+  if (drawState.mapId === 2) finishDraw(2);
+  else startDraw(2);
 });
 
 function onMapMouseMove(e, mapId) {
   if (drawState.mapId !== mapId) return;
   const map = mapId === 1 ? map1 : map2;
+  const existingPoints = mapId === 1 ? getLinePoints(line1) : getLinePoints(line2);
+  const hasExisting = existingPoints && existingPoints.length >= 2;
+  if (hasExisting) {
+    const connectionFrom = existingPoints[existingPoints.length - 1];
+    const connectionTo = drawState.points.length === 0 ? e.latlng : drawState.points[0];
+    const connectionLatlngs = [
+      Array.isArray(connectionFrom)
+        ? L.latLng(connectionFrom[0], connectionFrom[1])
+        : connectionFrom,
+      connectionTo,
+    ];
+    if (drawState.connectionPreviewLayer) {
+      drawState.connectionPreviewBorderLayer.setLatLngs(connectionLatlngs);
+      drawState.connectionPreviewLayer.setLatLngs(connectionLatlngs);
+    } else {
+      drawState.connectionPreviewBorderLayer = L.polyline(connectionLatlngs, {
+        ...LINE_BORDER_STYLE,
+        dashArray: "5,5",
+        className: "leaflet-draw-animated-dash",
+      }).addTo(map);
+      drawState.connectionPreviewLayer = L.polyline(connectionLatlngs, {
+        ...LINE_STYLE,
+        dashArray: "5,5",
+        className: "leaflet-draw-animated-dash",
+      }).addTo(map);
+    }
+  } else {
+    removeConnectionPreview(map);
+  }
   if (drawState.points.length < 1) {
     removeSegmentPreview(map);
     return;
@@ -524,17 +569,21 @@ function onMapMouseMove(e, mapId) {
     drawState.segmentPreviewBorderLayer = L.polyline(latlngs, {
       ...LINE_BORDER_STYLE,
       dashArray: "5,5",
+      className: "leaflet-draw-animated-dash",
     }).addTo(map);
     drawState.segmentPreviewLayer = L.polyline(latlngs, {
       ...LINE_STYLE,
       dashArray: "5,5",
+      className: "leaflet-draw-animated-dash",
     }).addTo(map);
   }
 }
 
 function onMapMouseOut(e, mapId) {
   if (drawState.mapId !== mapId) return;
-  removeSegmentPreview(mapId === 1 ? map1 : map2);
+  const map = mapId === 1 ? map1 : map2;
+  removeSegmentPreview(map);
+  removeConnectionPreview(map);
 }
 
 function onMapClick(e, mapId) {
