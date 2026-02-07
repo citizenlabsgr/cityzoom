@@ -383,8 +383,28 @@ function setLine(map, lineVar, latlngs) {
   }
 }
 
+let toastTimeout = null;
+
+function showToast(message) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = message;
+  el.classList.add("visible");
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(function () {
+    el.classList.remove("visible");
+    toastTimeout = null;
+  }, 3000);
+}
+
 function applyFragmentToMaps() {
+  const raw = window.location.hash.slice(1).trim();
   const { line1: pts1, line2: pts2 } = parseFragment();
+  if (raw && !pts1 && !pts2) {
+    showToast("Invalid map annotations.");
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    return;
+  }
   if (pts1) setLine(map1, "line1", pts1);
   else if (line1 || line1Border) {
     if (line1Border) map1.removeLayer(line1Border);

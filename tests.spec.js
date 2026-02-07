@@ -118,4 +118,14 @@ test.describe("City Zoom", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("#copyButton")).toHaveText("Copy URL");
   });
+
+  test("invalid points fragment shows toast and removes fragment", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.evaluate(() => {
+      window.location.hash = "!";
+    });
+    await expect(page).not.toHaveURL(/\#/, { timeout: 5000 });
+    await expect(page.locator("#toast")).toContainText("Invalid map annotations");
+  });
 });
