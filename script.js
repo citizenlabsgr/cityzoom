@@ -111,6 +111,9 @@ const searchControl2 = new GeoSearchControl({
 map1.addControl(searchControl1);
 map2.addControl(searchControl2);
 
+// Close-to-point threshold in pixels to complete the circuit
+const CLOSE_POINT_PX = 15;
+
 // Line segment and trash icons for draw control
 const LINE_SEGMENT_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-line-icon"><circle cx="6" cy="18" r="1.5" fill="currentColor"/><circle cx="18" cy="6" r="1.5" fill="currentColor"/><line x1="6" y1="18" x2="18" y2="6"/></svg>';
@@ -398,6 +401,7 @@ let drawState = {
   segmentPreviewLayer: null,
   connectionPreviewBorderLayer: null,
   connectionPreviewLayer: null,
+  closeIndicatorLayer: null,
 };
 
 function startDraw(mapId) {
@@ -410,6 +414,7 @@ function startDraw(mapId) {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closeIndicatorLayer: null,
   };
   document.getElementById("drawBox1").classList.toggle("active", mapId === 1);
   document.getElementById("drawBox2").classList.toggle("active", mapId === 2);
@@ -439,12 +444,22 @@ function removeConnectionPreview(map) {
   }
 }
 
+function removeCloseIndicator(map) {
+  if (drawState.closeIndicatorLayer) {
+    map.removeLayer(drawState.closeIndicatorLayer);
+    drawState.closeIndicatorLayer = null;
+  }
+  document.getElementById("wrapper1").classList.remove("within-close-range");
+  document.getElementById("wrapper2").classList.remove("within-close-range");
+}
+
 function cancelDraw() {
   const map = drawState.mapId === 1 ? map1 : map2;
   if (drawState.previewBorderLayer) map.removeLayer(drawState.previewBorderLayer);
   if (drawState.previewLayer) map.removeLayer(drawState.previewLayer);
   removeSegmentPreview(map);
   removeConnectionPreview(map);
+  removeCloseIndicator(map);
   drawState = {
     mapId: null,
     points: [],
@@ -454,6 +469,7 @@ function cancelDraw() {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closeIndicatorLayer: null,
   };
   document.getElementById("drawBox1").classList.remove("active");
   document.getElementById("drawBox2").classList.remove("active");
@@ -486,6 +502,7 @@ function finishDraw(mapId) {
   if (drawState.previewLayer) map.removeLayer(drawState.previewLayer);
   removeSegmentPreview(map);
   removeConnectionPreview(map);
+  removeCloseIndicator(map);
   if (mapId === 1) {
     setLine(map1, "line1", combined);
     updateFragment(combined, getLinePoints(line2));
@@ -502,6 +519,7 @@ function finishDraw(mapId) {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closeIndicatorLayer: null,
   };
   document.getElementById("drawBox1").classList.remove("active");
   document.getElementById("drawBox2").classList.remove("active");
@@ -556,6 +574,32 @@ function onMapMouseMove(e, mapId) {
   } else {
     removeConnectionPreview(map);
   }
+  if (drawState.points.length >= 2) {
+    const first = drawState.points[0];
+    const p0 = map.latLngToContainerPoint(first);
+    const p1 = map.latLngToContainerPoint(e.latlng);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const inCloseRange = dx * dx + dy * dy <= CLOSE_POINT_PX * CLOSE_POINT_PX;
+    if (inCloseRange) {
+      const wrapper = mapId === 1 ? "wrapper1" : "wrapper2";
+      document.getElementById(wrapper).classList.add("within-close-range");
+      if (!drawState.closeIndicatorLayer) {
+        drawState.closeIndicatorLayer = L.circleMarker(first, {
+          radius: CLOSE_POINT_PX,
+          color: "#0088ff",
+          fillColor: "#0088ff",
+          fillOpacity: 0.25,
+          weight: 2,
+          className: "leaflet-draw-close-indicator",
+        }).addTo(map);
+      }
+    } else {
+      removeCloseIndicator(map);
+    }
+  } else {
+    removeCloseIndicator(map);
+  }
   if (drawState.points.length < 1) {
     removeSegmentPreview(map);
     return;
@@ -584,13 +628,27 @@ function onMapMouseOut(e, mapId) {
   const map = mapId === 1 ? map1 : map2;
   removeSegmentPreview(map);
   removeConnectionPreview(map);
+  removeCloseIndicator(map);
 }
 
 function onMapClick(e, mapId) {
   if (drawState.mapId !== mapId) return;
   e.originalEvent.preventDefault();
+  const map = mapId === 1 ? map1 : map2;
+  if (drawState.points.length >= 2) {
+    const first = drawState.points[0];
+    const p0 = map.latLngToContainerPoint(first);
+    const p1 = map.latLngToContainerPoint(e.latlng);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    if (dx * dx + dy * dy <= CLOSE_POINT_PX * CLOSE_POINT_PX) {
+      drawState.points.push(L.latLng(first.lat, first.lng));
+      finishDraw(mapId);
+      return;
+    }
+  }
   drawState.points.push(e.latlng);
-  updatePreview(mapId === 1 ? map1 : map2, drawState.points);
+  updatePreview(map, drawState.points);
 }
 
 function onMapDblClick(e, mapId) {

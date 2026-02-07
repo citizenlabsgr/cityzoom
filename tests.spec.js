@@ -76,6 +76,21 @@ test.describe("City Zoom", () => {
     expect(lineSegments).toBeGreaterThanOrEqual(3);
   });
 
+  test("clicking close to first point completes circuit and exits annotation mode", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.click({ position: { x: 105, y: 150 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
   test("Copy URL resets to Copy URL when drawing fragment changes", async ({
     page,
   }) => {

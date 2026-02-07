@@ -215,6 +215,10 @@ html {
   cursor: crosshair;
 }
 
+.map-wrapper.draw-mode.within-close-range .leaflet-container {
+  cursor: pointer;
+}
+
 @keyframes leaflet-draw-dash {
   to {
     stroke-dashoffset: -20;
