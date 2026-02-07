@@ -27,13 +27,6 @@ html {
   font-weight: bold;
 }
 
-#header .tagline {
-  color: #888;
-  margin: 0;
-  font-size: 14px;
-  font-weight: normal;
-}
-
 #randomizeButton.randomize-icon {
   background: transparent;
   color: #888;
@@ -52,6 +45,13 @@ html {
 #randomizeButton.randomize-icon:hover {
   color: #ccc;
   border-color: #888;
+}
+
+#header .tagline {
+  color: #888;
+  margin: 0;
+  font-size: 14px;
+  font-weight: normal;
 }
 
 #header .header-left {

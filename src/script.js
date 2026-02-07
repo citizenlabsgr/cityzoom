@@ -92,7 +92,7 @@ let copyTimeout = null;
 const originalButtonText = "Copy URL";
 
 // Randomize location from examples (data.json). Use lat1 to avoid picking the current example.
-const locationExamplesPromise = fetch("data.json").then((r) => r.json());
+const locationExamplesPromise = fetch("src/data.json").then((r) => r.json());
 
 function randomizeLocation() {
   locationExamplesPromise.then(function (examples) {
