@@ -74,43 +74,145 @@ html {
   background: #222;
 }
 
-#map1,
-#map2 {
+.map-wrapper {
   box-sizing: border-box;
   border: 10px solid black;
+  position: relative;
+}
+
+.map-wrapper #map1,
+.map-wrapper #map2 {
+  width: 100%;
+  height: 100%;
 }
 
 /* Styles for screens with width greater than height (landscape) */
 @media (min-aspect-ratio: 1/1) {
-  #map1 {
+  .map-wrapper {
     height: calc(100vh - 70px);
     width: 50%;
     float: left;
-    border-right-width: 0;
     margin-top: 45px;
   }
-  #map2 {
-    height: calc(100vh - 70px);
-    width: 50%;
-    float: left;
+  #wrapper1 {
+    border-right-width: 0;
+  }
+  #wrapper2 {
     border-left-width: 10px;
-    margin-top: 45px;
   }
 }
 
 /* Styles for screens with height greater than width (portrait) */
 @media (max-aspect-ratio: 1/1) {
-  #map1 {
+  .map-wrapper {
     height: calc((100vh - 70px) / 2);
     width: 100%;
+  }
+  #wrapper1 {
     border-bottom-width: 0;
     margin-top: 45px;
   }
-  #map2 {
-    height: calc((100vh - 70px) / 2);
-    width: 100%;
+  #wrapper2 {
     border-top-width: 10px;
   }
+}
+
+/* Draw line control – match Leaflet zoom bar exactly */
+.leaflet-draw-line.leaflet-bar {
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+  border-radius: 4px;
+}
+
+.leaflet-touch .leaflet-draw-line.leaflet-bar {
+  box-shadow: none;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  background-clip: padding-box;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font:
+    12px/1.5 "Helvetica Neue",
+    Arial,
+    Helvetica,
+    sans-serif;
+  color: #333;
+  background-color: #fff;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.leaflet-touch .leaflet-draw-line .leaflet-draw-line-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.leaflet-touch .leaflet-draw-line .leaflet-draw-line-btn:first-child {
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+
+.leaflet-touch .leaflet-draw-line .leaflet-draw-line-btn:last-child {
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn svg {
+  display: block;
+  margin: auto;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.leaflet-draw-line .leaflet-draw-line-icon,
+.leaflet-draw-line .leaflet-draw-trash-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.leaflet-touch .leaflet-draw-line .leaflet-draw-line-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn:hover {
+  background-color: #f4f4f4;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  border-bottom: none;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn.active {
+  background-color: #0088ff;
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn.active .leaflet-draw-line-icon {
+  color: #fff;
+}
+
+.leaflet-draw-line .leaflet-draw-line-btn.active:hover {
+  background-color: #0066cc;
+}
+
+.map-wrapper.draw-mode .leaflet-container {
+  cursor: crosshair;
 }
 
 #footer {

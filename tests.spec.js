@@ -44,4 +44,35 @@ test.describe("City Zoom", () => {
     await page.waitForSelector("#map1", { state: "attached" });
     await expect(page.locator("#map1")).toBeVisible();
   });
+
+  test("drawing persists after Escape", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.locator("#drawBox1").click();
+    const map1 = page.locator("#map1");
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("Copy URL resets to Copy URL when drawing fragment changes", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#copyButton");
+    await page.evaluate(() => {
+      const btn = document.getElementById("copyButton");
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+    });
+    await expect(page.locator("#copyButton")).toHaveText("Copied!");
+    await page.locator("#drawBox1").click();
+    const map1 = page.locator("#map1");
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#copyButton")).toHaveText("Copy URL");
+  });
 });
