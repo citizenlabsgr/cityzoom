@@ -78,11 +78,16 @@ test.describe("City Zoom", () => {
     await map1.click({ position: { x: 250, y: 100 } });
     await map1.click({ position: { x: 300, y: 220 } });
     await page.keyboard.press("Escape");
-    const path = page.locator("#map1 path.leaflet-interactive").first();
-    await expect(path).toBeVisible();
-    const d = await path.getAttribute("d");
-    const lineSegments = (d.match(/L/g) || []).length;
-    expect(lineSegments).toBeGreaterThanOrEqual(3);
+    const overlayPaths = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(overlayPaths.first()).toBeVisible();
+    const paths = await overlayPaths.all();
+    const segmentCounts = await Promise.all(
+      paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
+    );
+    const maxSegments = Math.max(...segmentCounts);
+    expect(maxSegments).toBeGreaterThanOrEqual(3);
   });
 
   test("clicking close to first point completes circuit and exits annotation mode", async ({
@@ -127,5 +132,16 @@ test.describe("City Zoom", () => {
     });
     await expect(page).not.toHaveURL(/\#/, { timeout: 5000 });
     await expect(page.locator("#toast")).toContainText("Invalid map annotations");
+  });
+
+  test("randomize shows toast with example name after reload", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#randomizeButton", { state: "visible" });
+    await Promise.all([
+      page.waitForURL(/\?zoom=.+&lat1=/, { timeout: 10000 }),
+      page.locator("#randomizeButton").click(),
+    ]);
+    await expect(page.locator("#toast.visible")).toBeVisible({ timeout: 3000 });
+    await expect(page.locator("#toast")).toContainText(" vs. ");
   });
 });

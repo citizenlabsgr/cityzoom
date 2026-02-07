@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Michigan's Adventure vs. Cedar Point",
+    "zoom": 15,
+    "lat1": 43.34416,
+    "lon1": -86.27578,
+    "lat2": 41.48401,
+    "lon2": -82.68548
+  },
+  {
+    "name": "Chicago Loop vs. Detroit People Mover",
+    "zoom": 15,
+    "lat1": 41.88093,
+    "lon1": -87.62925,
+    "lat2": 42.33036,
+    "lon2": -83.04713
+  },
+  {
+    "name": "SoFi Stadium vs. Ford Field",
+    "zoom": 16,
+    "lat1": 33.95089,
+    "lon1": -118.33849,
+    "lat2": 42.33994,
+    "lon2": -83.04555
+  },
+  {
+    "name": "Dodger Stadium vs. Comerica Park",
+    "zoom": 16,
+    "lat1": 34.07413,
+    "lon1": -118.24072,
+    "lat2": 42.33954,
+    "lon2": -83.04922
+  },
+  {
+    "name": "I-96/I-696/M-5 Interchange vs. I-96/US-131 Interchange",
+    "zoom": 14,
+    "lat1": 42.48469,
+    "lon1": -83.43823,
+    "lat2": 43.01731,
+    "lon2": -85.67808
+  }
+]

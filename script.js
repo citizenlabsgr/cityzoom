@@ -91,6 +91,41 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let copyTimeout = null;
 const originalButtonText = "Copy URL";
 
+// Randomize location from examples (data.json). Use lat1 to avoid picking the current example.
+const locationExamplesPromise = fetch("data.json").then((r) => r.json());
+
+function randomizeLocation() {
+  locationExamplesPromise.then(function (examples) {
+    if (!examples.length) return;
+    const p = new URLSearchParams(window.location.search);
+    const round5 = (n) => Math.round(Number(n) * 1e5) / 1e5;
+    const currentLat1 = p.has("lat1") ? round5(p.get("lat1")) : null;
+    const others =
+      currentLat1 != null
+        ? examples.filter(function (e) {
+            return round5(e.lat1) !== currentLat1;
+          })
+        : examples;
+    if (!others.length) return;
+    const ex = others[Math.floor(Math.random() * others.length)];
+    const params = new URLSearchParams({
+      zoom: ex.zoom,
+      lat1: ex.lat1,
+      lon1: ex.lon1,
+      lat2: ex.lat2,
+      lon2: ex.lon2,
+    });
+    const hash = window.location.hash || "";
+    const url = window.location.pathname + "?" + params.toString() + hash;
+    try {
+      sessionStorage.setItem("cityzoom_randomize_toast", ex.name);
+    } catch (_) {}
+    window.location.replace(url);
+  });
+}
+
+document.getElementById("randomizeButton").addEventListener("click", randomizeLocation);
+
 // Enable search
 
 const { GeoSearchControl, OpenStreetMapProvider } = window.GeoSearch;
@@ -727,6 +762,15 @@ document.getElementById("clearBox2").addEventListener("click", function () {
 
 applyFragmentToMaps();
 updateClearButtons();
+try {
+  const toastName = sessionStorage.getItem("cityzoom_randomize_toast");
+  if (toastName) {
+    sessionStorage.removeItem("cityzoom_randomize_toast");
+    setTimeout(function () {
+      showToast(toastName);
+    }, 0);
+  }
+} catch (_) {}
 window.addEventListener("hashchange", function () {
   applyFragmentToMaps();
   updateClearButtons();

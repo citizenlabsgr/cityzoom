@@ -32,13 +32,30 @@ html {
   margin: 0;
   font-size: 14px;
   font-weight: normal;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+}
+
+#randomizeButton.randomize-icon {
+  background: transparent;
+  color: #888;
+  border: 1px solid #555;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+}
+
+#randomizeButton.randomize-icon:hover {
+  color: #ccc;
+  border-color: #888;
 }
 
 @media (max-width: 768px) {
-  #header .tagline {
+  #header .tagline-wrap {
     display: none;
   }
 }
@@ -46,6 +63,20 @@ html {
 #header .header-left {
   display: flex;
   align-items: center;
+}
+
+#header .tagline-wrap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#header .tagline {
+  position: static;
+  transform: none;
 }
 
 #copyButton {
