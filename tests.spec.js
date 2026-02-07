@@ -143,6 +143,21 @@ test.describe("City Zoom", () => {
     await expect(page.locator("#randomizeButton")).toBeHidden();
   });
 
+  test("location button sets map to current position without changing zoom", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: 42.35, longitude: -83.05 });
+    await page.goto("/?zoom=11&lat1=42.33&lon1=-83.04&lat2=42.33&lon2=-83.04");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const locationBtn = page.locator(".leaflet-control-location-btn").first();
+    await expect(locationBtn).toBeVisible({ timeout: 5000 });
+    await locationBtn.click();
+    await expect(page).toHaveURL(/lat1=42\.3/, { timeout: 5000 });
+    await expect(page).toHaveURL(/zoom=11/);
+  });
+
   test("randomize shows toast with example name after reload", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("#randomizeButton", { state: "visible" });

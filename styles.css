@@ -148,6 +148,78 @@ html {
   }
 }
 
+/* Hide geosearch magnifying-glass icon (bar style has input only) */
+.leaflet-control-geosearch .leaflet-bar-part,
+.leaflet-geosearch-bar .leaflet-bar-part {
+  display: none;
+}
+
+/* Location button to the right of search input – override library hiding bar in top/bottom */
+.leaflet-top .leaflet-geosearch-bar,
+.leaflet-bottom .leaflet-geosearch-bar {
+  display: flex !important;
+}
+.leaflet-control-geosearch,
+.leaflet-geosearch-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: fit-content;
+  max-width: 100%;
+  overflow: visible;
+}
+
+/* Form must be in flow so location button sits to the right of the search box (library uses position:absolute) */
+.leaflet-control-geosearch .leaflet-geosearch-bar,
+.leaflet-control-geosearch form,
+.leaflet-geosearch-bar form {
+  position: relative;
+  flex: 1;
+  min-width: 374px; /* keep search box same size as original 400px bar minus location button */
+  margin-right: 0;
+  padding-right: 0; /* position location button just to the right of the search input */
+}
+
+/* Location button – same as zoom bar links */
+.leaflet-control-geosearch .leaflet-control-location-btn,
+.leaflet-geosearch-bar .leaflet-control-location-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  background-color: #fff;
+  border: none;
+  border-left: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.leaflet-control-geosearch .leaflet-control-location-btn:hover:not(:disabled),
+.leaflet-geosearch-bar .leaflet-control-location-btn:hover:not(:disabled) {
+  background-color: #f4f4f4;
+}
+
+.leaflet-control-geosearch .leaflet-control-location-btn:disabled,
+.leaflet-geosearch-bar .leaflet-control-location-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  background-color: #f4f4f4;
+  color: #bbb;
+}
+
+.leaflet-touch .leaflet-control-geosearch .leaflet-control-location-btn,
+.leaflet-touch .leaflet-geosearch-bar .leaflet-control-location-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
+
 /* Draw line control – match Leaflet zoom bar exactly */
 .leaflet-draw-line.leaflet-bar {
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);

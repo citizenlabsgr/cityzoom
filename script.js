@@ -143,8 +143,49 @@ const searchControl2 = new GeoSearchControl({
   searchLabel: "Search for a location",
 });
 
+const LOCATION_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+function addLocationButtonToSearch(map) {
+  const container = map.getContainer();
+  const geosearchEl =
+    container.querySelector(".leaflet-control-geosearch") ||
+    container.querySelector(".leaflet-geosearch-bar");
+  if (!geosearchEl) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "leaflet-control-location-btn";
+  btn.title = "Set map to my location";
+  btn.setAttribute("aria-label", "Set map to my location");
+  btn.innerHTML = LOCATION_ICON;
+  L.DomEvent.disableClickPropagation(btn);
+  L.DomEvent.on(btn, "click", function () {
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported");
+      return;
+    }
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        map.setView([pos.coords.latitude, pos.coords.longitude], map.getZoom());
+        syncMaps();
+        btn.disabled = false;
+      },
+      function () {
+        showToast("Could not get location");
+        btn.disabled = false;
+      }
+    );
+  });
+  geosearchEl.appendChild(btn);
+}
+
 map1.addControl(searchControl1);
 map2.addControl(searchControl2);
+setTimeout(function () {
+  addLocationButtonToSearch(map1);
+  addLocationButtonToSearch(map2);
+}, 0);
 
 // Close-to-point threshold in pixels to complete the circuit
 const CLOSE_POINT_PX = 15;
