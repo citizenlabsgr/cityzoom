@@ -179,12 +179,22 @@ map2.on("zoomend", function () {
 map1.on("moveend", syncMaps);
 map2.on("moveend", syncMaps);
 
+function locationToLatLng(loc) {
+  if (!loc) return null;
+  const lat = typeof loc.lat === "number" ? loc.lat : loc.y;
+  const lng = typeof loc.lng === "number" ? loc.lng : loc.x;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  return L.latLng(lat, lng);
+}
+
 map1.on("geosearch/showlocation", function (e) {
-  map1.setView(e.location, 13);
+  const center = locationToLatLng(e.location);
+  if (center) map1.setView(center, 13);
 });
 
 map2.on("geosearch/showlocation", function (e) {
-  map2.setView(e.location, 13);
+  const center = locationToLatLng(e.location);
+  if (center) map2.setView(center, 13);
 });
 
 // Line drawing (one polyline per map, encoded in URL fragment)

@@ -45,6 +45,15 @@ test.describe("City Zoom", () => {
     await expect(page.locator("#map1")).toBeVisible();
   });
 
+  test("can fill in the search form", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const searchInput = page.locator(".leaflet-control-geosearch input").first();
+    await searchInput.waitFor({ state: "visible" });
+    await searchInput.fill("Chicago");
+    await expect(searchInput).toHaveValue("Chicago");
+  });
+
   test("drawing persists after Escape", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("#map1", { state: "attached" });
