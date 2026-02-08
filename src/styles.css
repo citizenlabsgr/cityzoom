@@ -180,9 +180,9 @@ html {
 .leaflet-geosearch-bar form {
   position: relative;
   flex: 1;
-  min-width: 374px; /* keep search box same size as original 400px bar minus location button */
+  min-width: min(400px, calc(100vw - 125px));
   margin-right: 0;
-  padding-right: 0; /* position location button just to the right of the search input */
+  padding-right: 0;
 }
 
 /* Location button – same as zoom bar links */
