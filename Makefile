@@ -9,6 +9,9 @@ all: format test
 .PHONY: format
 format:
 	npx --yes prettier --write . --log-level=silent
+ifdef CI
+	git diff --exit-code
+endif
 
 .PHONY: test
 test: install
