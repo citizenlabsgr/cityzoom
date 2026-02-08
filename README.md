@@ -2,7 +2,7 @@
 
 Compare two locations side by side with synchronized zoom levels. Annotate the maps to highlight interesting comparisons. Share a link to save or send your view.
 
-> [cityzoom.link](https://cityzoom.link/?zoom=18&lat1=42.96445&lon1=-85.66956&lat2=42.96903&lon2=-85.67162)
+> [cityzoom.link](https://cityzoom.link/?zoom=18&lat1=42.96445&lon1=-85.66956&lat2=42.96903&lon2=-85.67162#AACAPwAAoEAAAMBAjNsrQgpXq8JX2ytC1larwqbbK0KuVqvC2tsrQuNWq8KM2ytCClerwkLgK0L2V6vCQuArQqhXq8Kq4CtCqFerwqrgK0IQWKvCQuArQhBYq8JC4CtC9lerwg)
 
 ## Features
 
