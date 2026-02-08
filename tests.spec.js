@@ -158,6 +158,18 @@ test.describe("City Zoom", () => {
     await expect(page).toHaveURL(/zoom=11/);
   });
 
+  test("back button restores previous map view", async ({ page }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.evaluate(() => {
+      window.map1.setView([43, -84], 12);
+    });
+    await expect(page).toHaveURL(/lat1=43/);
+    await page.goBack();
+    await expect(page).toHaveURL(/lat1=42\.5/);
+    await expect(page).toHaveURL(/zoom=12/);
+  });
+
   test("randomize shows toast with example name after reload and clears fragment", async ({
     page,
   }) => {

@@ -3,7 +3,10 @@ function syncZoom(level) {
   map2.setZoom(level);
 }
 
+let applyingHistory = false;
+
 function syncMaps() {
+  if (applyingHistory) return;
   const center1 = map1.getCenter();
   const center2 = map2.getCenter();
   const zoom = map1.getZoom();
@@ -417,9 +420,10 @@ function parseFragment() {
 }
 
 function updateFragment(line1Points, line2Points) {
+  dismissCopiedState();
   const encoded = encodeDrawingBinary(line1Points, line2Points);
   const hash = encoded ? "#" + encoded : "";
-  window.location.replace(window.location.pathname + window.location.search + hash);
+  history.pushState(null, "", window.location.pathname + window.location.search + hash);
 }
 
 function getLinePoints(lineLayer) {
@@ -813,6 +817,31 @@ try {
     }, 0);
   }
 } catch (_) {}
+function applyUrlToMaps() {
+  const p = new URLSearchParams(window.location.search);
+  if (
+    p.has("zoom") &&
+    p.has("lat1") &&
+    p.has("lon1") &&
+    p.has("lat2") &&
+    p.has("lon2")
+  ) {
+    applyingHistory = true;
+    const zoom = parseInt(p.get("zoom"), 10);
+    const lat1 = parseFloat(p.get("lat1"));
+    const lon1 = parseFloat(p.get("lon1"));
+    const lat2 = parseFloat(p.get("lat2"));
+    const lon2 = parseFloat(p.get("lon2"));
+    map1.setView([lat1, lon1], zoom);
+    map2.setView([lat2, lon2], zoom);
+    applyingHistory = false;
+  }
+  applyFragmentToMaps();
+  updateClearButtons();
+  dismissCopiedState();
+}
+
+window.addEventListener("popstate", applyUrlToMaps);
 window.addEventListener("hashchange", function () {
   applyFragmentToMaps();
   updateClearButtons();
