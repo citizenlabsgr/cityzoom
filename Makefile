@@ -15,7 +15,7 @@ endif
 
 .PHONY: test
 test: install
-	npx playwright test
+	npx playwright test --update-snapshots
 
 .PHONY: dev
 dev: install

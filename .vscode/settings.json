@@ -9,6 +9,7 @@
     "onclick",
     "showlocation",
     "stylesheet",
+    "VIEWPORTS",
     "zoomend"
   ],
   "djlint.showInstallError": false

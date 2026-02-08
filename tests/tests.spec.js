@@ -184,3 +184,23 @@ test.describe("City Zoom", () => {
     await expect(page).not.toHaveURL(/#/);
   });
 });
+
+// Viewport sizes: small (mobile), medium (tablet), large (desktop)
+const VIEWPORTS = [
+  { name: "small", width: 375, height: 667 },
+  { name: "medium", width: 768, height: 1024 },
+  { name: "large", width: 1280, height: 720 },
+];
+
+test.describe("Visual snapshots", () => {
+  for (const { name, width, height } of VIEWPORTS) {
+    test(`snapshot at ${name} viewport (${width}x${height})`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await page.waitForSelector("#map1", { state: "attached" });
+      await expect(page).toHaveScreenshot(`home-${name}.png`, {
+        fullPage: true,
+      });
+    });
+  }
+});

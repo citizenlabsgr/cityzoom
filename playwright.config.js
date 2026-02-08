@@ -7,6 +7,11 @@ module.exports = defineConfig({
   use: {
     baseURL: "http://localhost:8080",
   },
+  expect: {
+    toHaveScreenshot: {
+      pathTemplate: "tests/snapshots/{arg}{ext}",
+    },
+  },
   timeout: 5000, // this is a static prototype so everything should be fast
   projects: [
     {
