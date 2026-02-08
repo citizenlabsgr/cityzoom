@@ -158,8 +158,10 @@ test.describe("City Zoom", () => {
     await expect(page).toHaveURL(/zoom=11/);
   });
 
-  test("randomize shows toast with example name after reload", async ({ page }) => {
-    await page.goto("/");
+  test("randomize shows toast with example name after reload and clears fragment", async ({
+    page,
+  }) => {
+    await page.goto("/#something");
     await page.waitForSelector("#randomizeButton", { state: "visible" });
     await Promise.all([
       page.waitForURL(/\?zoom=.+&lat1=/, { timeout: 10000 }),
@@ -167,5 +169,6 @@ test.describe("City Zoom", () => {
     ]);
     await expect(page.locator("#toast.visible")).toBeVisible({ timeout: 3000 });
     await expect(page.locator("#toast")).toContainText(" vs. ");
+    await expect(page).not.toHaveURL(/#/);
   });
 });

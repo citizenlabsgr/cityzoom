@@ -115,8 +115,7 @@ function randomizeLocation() {
       lat2: ex.lat2,
       lon2: ex.lon2,
     });
-    const hash = window.location.hash || "";
-    const url = window.location.pathname + "?" + params.toString() + hash;
+    const url = window.location.pathname + "?" + params.toString();
     try {
       sessionStorage.setItem("cityzoom_randomize_toast", ex.name);
     } catch (_) {}

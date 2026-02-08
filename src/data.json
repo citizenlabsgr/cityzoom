@@ -1,5 +1,13 @@
 [
   {
+    "name": "Disneyland vs. Disney World",
+    "zoom": 16,
+    "lat1": 33.81229,
+    "lon1": -117.91858,
+    "lat2": 28.4194,
+    "lon2": -81.5803
+  },
+  {
     "name": "Michigan's Adventure vs. Cedar Point",
     "zoom": 15,
     "lat1": 43.34416,
