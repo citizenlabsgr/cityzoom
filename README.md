@@ -18,4 +18,3 @@ The app is static, but a recent version of Node.js (with `npx`) is used for loca
 - `make run` — starts live-reload server: http://localhost:8080
 - `make dev` — runs the formatter + tests on file changes
 - `make all` — runs all of the pre-commit actions
-
