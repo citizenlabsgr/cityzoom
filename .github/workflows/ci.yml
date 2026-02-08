@@ -1,4 +1,4 @@
-name: CI
+name: tests and formatting
 
 on:
   push:
@@ -15,11 +15,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install
+      - name: Install dependencies
         run: make install
 
-      - name: Test
+      - name: Run tests
         run: make test
 
-      - name: Format
+      - name: Check formatting
         run: make format
