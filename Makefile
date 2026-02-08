@@ -15,7 +15,11 @@ endif
 
 .PHONY: test
 test: install
+ifdef CI
+	npx playwright test --grep-invert="@snapshot"
+else
 	npx playwright test --update-snapshots
+endif
 
 .PHONY: dev
 dev: install

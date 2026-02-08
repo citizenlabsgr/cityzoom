@@ -192,7 +192,7 @@ const VIEWPORTS = [
   { name: "large", width: 1280, height: 720 },
 ];
 
-test.describe("Visual snapshots", () => {
+test.describe("Visual snapshots", { tag: "@snapshot" }, () => {
   for (const { name, width, height } of VIEWPORTS) {
     test(`snapshot at ${name} viewport (${width}x${height})`, async ({ page }) => {
       await page.setViewportSize({ width, height });
