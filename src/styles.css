@@ -57,6 +57,7 @@ html {
 #header .header-left {
   display: flex;
   align-items: center;
+  margin-left: -10px; /* pull left to align with map edge (header padding 20px − map border 10px) */
 }
 
 #header .tagline-wrap {
@@ -73,7 +74,7 @@ html {
   transform: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 550px) {
   #header .tagline-wrap {
     display: none !important;
   }
@@ -83,14 +84,15 @@ html {
   background: black;
   color: white;
   border: 2px solid white;
-  padding: 10px 20px;
-  font-size: 14px;
+  padding: 6px 14px;
+  font-size: 13px;
   cursor: pointer;
   border-radius: 4px;
   font-family: Arial, sans-serif;
   transition:
     background 0.3s,
     border-color 0.3s;
+  margin-right: -10px; /* pull right to align with map edge (header padding 20px − map border 10px) */
 }
 
 #copyButton:hover {
@@ -150,6 +152,13 @@ html {
   }
   #wrapper2 {
     border-top-width: 10px;
+  }
+}
+
+/* Portrait + small (phone): thin footer bar, so maps extend to avoid a large black gap */
+@media (max-aspect-ratio: 1/1) and (max-width: 480px) {
+  .map-wrapper {
+    height: calc((100vh - 50px) / 2); /* 45px header + 5px footer */
   }
 }
 
@@ -401,4 +410,14 @@ html {
 
 #footer b {
   color: #aaa;
+}
+
+@media (max-width: 480px) {
+  #footer {
+    height: 5px;
+    padding: 0;
+    line-height: 0;
+    font-size: 0;
+    overflow: hidden;
+  }
 }

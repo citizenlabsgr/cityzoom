@@ -199,7 +199,7 @@ test.describe("Visual snapshots", { tag: "@snapshot" }, () => {
       await page.goto("/");
       await page.waitForSelector("#map1", { state: "attached" });
       await expect(page).toHaveScreenshot(`home-${name}.png`, {
-        fullPage: true,
+        fullPage: false /* viewport only; app fills viewport so full scroll adds phantom blank space */,
       });
     });
   }
