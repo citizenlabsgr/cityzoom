@@ -134,13 +134,15 @@ test.describe("City Zoom", () => {
     await expect(page.locator("#toast")).toContainText("Invalid map annotations");
   });
 
-  test("tagline and randomize button hidden on small screens", async ({ page }) => {
+  test("tagline hidden on small screens, randomize button visible next to header", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
     await page.waitForSelector("#header");
     await expect(page.locator("#header h1")).toContainText("City Zoom");
-    await expect(page.locator("#header .tagline-wrap")).toBeHidden();
-    await expect(page.locator("#randomizeButton")).toBeHidden();
+    await expect(page.locator("#header .tagline")).toBeHidden();
+    await expect(page.locator("#randomizeButton")).toBeVisible();
   });
 
   test("location button sets map to current position without changing zoom", async ({
