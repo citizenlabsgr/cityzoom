@@ -32,7 +32,7 @@ test.afterEach(async ({ page }) => {
   consoleErrors.delete(page);
 });
 
-test.describe("City Zoom", () => {
+test.describe("Home page", () => {
   test("should load the page and show the header", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("#header");
@@ -52,198 +52,6 @@ test.describe("City Zoom", () => {
     await searchInput.waitFor({ state: "visible" });
     await searchInput.fill("Chicago");
     await expect(searchInput).toHaveValue("Chicago");
-  });
-
-  test.describe("circle tool", () => {
-    test("two clicks place circle and update URL", async ({ page }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#circleBox1").click();
-      await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
-      await map1.click({ position: { x: 150, y: 200 } });
-      await map1.click({ position: { x: 250, y: 200 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await expect(page).toHaveURL(/\#.+/);
-      await expect(
-        page.locator("#map1 path.leaflet-interactive").first()
-      ).toBeVisible();
-    });
-
-    test("circle persists in URL and is restored on reload", async ({ page }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#circleBox1").click();
-      await map1.click({ position: { x: 150, y: 200 } });
-      await map1.click({ position: { x: 250, y: 200 } });
-      const url = page.url();
-      await expect(url).toMatch(/\#.+/);
-      await page.goto(url);
-      await page.waitForSelector("#map1", { state: "attached" });
-      await expect(
-        page.locator("#map1 path.leaflet-interactive").first()
-      ).toBeVisible();
-    });
-
-    test("can draw two circles on same map and both persist", async ({ page }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#circleBox1").click();
-      await map1.click({ position: { x: 120, y: 180 } });
-      await map1.click({ position: { x: 180, y: 180 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await page.locator("#circleBox1").click();
-      await map1.click({ position: { x: 220, y: 220 } });
-      await map1.click({ position: { x: 280, y: 220 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await expect(page).toHaveURL(/\#.+/);
-      const circles = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      await expect(circles.first()).toBeVisible();
-      await expect(circles).toHaveCount(4);
-      const url = page.url();
-      await page.goto(url);
-      await page.waitForSelector("#map1", { state: "attached" });
-      const circlesAfter = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      await expect(circlesAfter).toHaveCount(4);
-    });
-
-    test("no connection preview from previous line when in circle mode", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await page.keyboard.press("Escape");
-      const overlayPaths = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      const pathCountAfterLine = await overlayPaths.count();
-      await page.locator("#circleBox1").click();
-      await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
-      await map1.hover({ position: { x: 250, y: 100 } });
-      await expect(overlayPaths).toHaveCount(pathCountAfterLine);
-    });
-  });
-
-  test.describe("line tool", () => {
-    test("drawing persists after Escape", async ({ page }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      await page.locator("#drawBox1").click();
-      const map1 = page.locator("#map1");
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await page.keyboard.press("Escape");
-      await expect(page).toHaveURL(/\#.+/);
-      await expect(
-        page.locator("#map1 path.leaflet-interactive").first()
-      ).toBeVisible();
-    });
-
-    test("after completing a shape, next draw is not connected to previous", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await page.keyboard.press("Escape");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 250, y: 100 } });
-      await map1.click({ position: { x: 300, y: 220 } });
-      await page.keyboard.press("Escape");
-      const overlayPaths = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      await expect(overlayPaths.first()).toBeVisible();
-      const paths = await overlayPaths.all();
-      const segmentCounts = await Promise.all(
-        paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
-      );
-      const maxSegments = Math.max(...segmentCounts);
-      expect(maxSegments).toBeGreaterThanOrEqual(2);
-    });
-
-    test("Escape after one new segment keeps original closed shape and adds segment", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await map1.click({ position: { x: 105, y: 150 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 250, y: 100 } });
-      await map1.click({ position: { x: 300, y: 220 } });
-      await page.keyboard.press("Escape");
-      const overlayPaths = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      await expect(overlayPaths.first()).toBeVisible();
-      const paths = await overlayPaths.all();
-      const segmentCounts = await Promise.all(
-        paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
-      );
-      expect(Math.max(...segmentCounts)).toBeGreaterThanOrEqual(3);
-    });
-
-    test("after closing a second shape, only second shape is shown", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await map1.click({ position: { x: 105, y: 150 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 250, y: 100 } });
-      await map1.click({ position: { x: 300, y: 220 } });
-      await map1.click({ position: { x: 255, y: 100 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      const overlayPaths = page.locator(
-        "#map1 .leaflet-overlay-pane path.leaflet-interactive"
-      );
-      await expect(overlayPaths.first()).toBeVisible();
-      const paths = await overlayPaths.all();
-      const segmentCounts = await Promise.all(
-        paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
-      );
-      expect(Math.max(...segmentCounts)).toBe(2);
-    });
-
-    test("clicking close to first point completes circuit and exits annotation mode", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await page.waitForSelector("#map1", { state: "attached" });
-      const map1 = page.locator("#map1");
-      await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 100, y: 150 } });
-      await map1.click({ position: { x: 200, y: 180 } });
-      await map1.click({ position: { x: 105, y: 150 } });
-      await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      await expect(page).toHaveURL(/\#.+/);
-      await expect(
-        page.locator("#map1 path.leaflet-interactive").first()
-      ).toBeVisible();
-    });
   });
 
   test("Copy URL resets to Copy URL when drawing fragment changes", async ({
@@ -328,6 +136,188 @@ test.describe("City Zoom", () => {
   });
 });
 
+test.describe("Circle tool", () => {
+  test("two clicks place circle and update URL", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#circleBox1").click();
+    await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
+    await map1.click({ position: { x: 150, y: 200 } });
+    await map1.click({ position: { x: 250, y: 200 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("circle persists in URL and is restored on reload", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#circleBox1").click();
+    await map1.click({ position: { x: 150, y: 200 } });
+    await map1.click({ position: { x: 250, y: 200 } });
+    const url = page.url();
+    await expect(url).toMatch(/\#.+/);
+    await page.goto(url);
+    await page.waitForSelector("#map1", { state: "attached" });
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("can draw two circles on same map and both persist", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#circleBox1").click();
+    await map1.click({ position: { x: 120, y: 180 } });
+    await map1.click({ position: { x: 180, y: 180 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await page.locator("#circleBox1").click();
+    await map1.click({ position: { x: 220, y: 220 } });
+    await map1.click({ position: { x: 280, y: 220 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    const circles = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(circles.first()).toBeVisible();
+    await expect(circles).toHaveCount(4);
+    const url = page.url();
+    await page.goto(url);
+    await page.waitForSelector("#map1", { state: "attached" });
+    const circlesAfter = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(circlesAfter).toHaveCount(4);
+  });
+
+  test("no connection preview from previous line when in circle mode", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    const overlayPaths = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    const pathCountAfterLine = await overlayPaths.count();
+    await page.locator("#circleBox1").click();
+    await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
+    await map1.hover({ position: { x: 250, y: 100 } });
+    await expect(overlayPaths).toHaveCount(pathCountAfterLine);
+  });
+});
+
+test.describe("Line tool", () => {
+  test("drawing persists after Escape", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.locator("#drawBox1").click();
+    const map1 = page.locator("#map1");
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("after completing a shape, next draw is not connected to previous", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await page.keyboard.press("Escape");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 250, y: 100 } });
+    await map1.click({ position: { x: 300, y: 220 } });
+    await page.keyboard.press("Escape");
+    const overlayPaths = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(overlayPaths.first()).toBeVisible();
+    const paths = await overlayPaths.all();
+    const segmentCounts = await Promise.all(
+      paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
+    );
+    const maxSegments = Math.max(...segmentCounts);
+    expect(maxSegments).toBeGreaterThanOrEqual(2);
+  });
+
+  test("Escape after one new segment keeps original closed shape and adds segment", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.click({ position: { x: 105, y: 150 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 250, y: 100 } });
+    await map1.click({ position: { x: 300, y: 220 } });
+    await page.keyboard.press("Escape");
+    const overlayPaths = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(overlayPaths.first()).toBeVisible();
+    const paths = await overlayPaths.all();
+    const segmentCounts = await Promise.all(
+      paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
+    );
+    expect(Math.max(...segmentCounts)).toBeGreaterThanOrEqual(3);
+  });
+
+  test("after closing a second shape, only second shape is shown", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.click({ position: { x: 105, y: 150 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 250, y: 100 } });
+    await map1.click({ position: { x: 300, y: 220 } });
+    await map1.click({ position: { x: 255, y: 100 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    const overlayPaths = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(overlayPaths.first()).toBeVisible();
+    const paths = await overlayPaths.all();
+    const segmentCounts = await Promise.all(
+      paths.map((p) => p.getAttribute("d").then((d) => (d.match(/L/g) || []).length))
+    );
+    expect(Math.max(...segmentCounts)).toBe(2);
+  });
+
+  test("clicking close to first point completes circuit and exits annotation mode", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.click({ position: { x: 105, y: 150 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+});
+
 // Viewport sizes: small (mobile), medium (tablet), large (desktop)
 const VIEWPORTS = [
   { name: "small", width: 375, height: 667 },
@@ -335,7 +325,7 @@ const VIEWPORTS = [
   { name: "large", width: 1280, height: 720 },
 ];
 
-test.describe("Visual snapshots", { tag: "@snapshot" }, () => {
+test.describe("Map annotations", { tag: "@snapshot" }, () => {
   for (const { name, width, height } of VIEWPORTS) {
     test(`snapshot at ${name} viewport (${width}x${height})`, async ({ page }) => {
       await page.setViewportSize({ width, height });
@@ -343,26 +333,28 @@ test.describe("Visual snapshots", { tag: "@snapshot" }, () => {
       await page.waitForSelector("#map1", { state: "attached" });
       const map1 = page.locator("#map1");
       const map2 = page.locator("#map2");
-      // Map1: closed shape (triangle) then a separate line segment
+      // Map1: line segment then closed triangle (4 clicks, 4th same as 1st)
       await page.locator("#drawBox1").click();
       await map1.click({ position: { x: 100, y: 150 } });
       await map1.click({ position: { x: 200, y: 180 } });
-      await map1.click({ position: { x: 105, y: 150 } });
+      await page.keyboard.press("Escape");
       await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
       await page.locator("#drawBox1").click();
-      await map1.click({ position: { x: 250, y: 100 } });
+      const triangleFirst = { x: 250, y: 100 };
+      await map1.click({ position: triangleFirst });
       await map1.click({ position: { x: 300, y: 220 } });
-      await page.keyboard.press("Escape");
+      await map1.click({ position: { x: 200, y: 220 } });
+      await map1.click({ position: triangleFirst });
       await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
       // Map2: circle
       await page.locator("#circleBox2").click();
       await map2.click({ position: { x: 150, y: 200 } });
       await map2.click({ position: { x: 250, y: 200 } });
       await expect(page.locator("#wrapper2")).not.toHaveClass(/draw-mode/);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       await expect(page).toHaveScreenshot(`home-${name}.png`, {
         fullPage: false /* viewport only; app fills viewport so full scroll adds phantom blank space */,
-        maxDiffPixelRatio: 0.02,
+        maxDiffPixelRatio: 0.01,
       });
     });
   }

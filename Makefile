@@ -28,3 +28,9 @@ dev: install
 .PHONY: run
 run:
 	npx --yes live-server --no-browser --watch=index.html,src
+
+.PHONY: clean
+clean:
+	rm -rf node_modules
+	rm -rf test-results
+	rm -rf tests/snapshots

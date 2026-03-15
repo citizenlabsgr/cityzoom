@@ -942,7 +942,11 @@ function finishDraw(mapId) {
   const appendAsNewSegment =
     drawState.startedAfterCompletedShape && !isClosedShape && existingSegments?.length;
   let result;
-  if (replaceWithNewOnly || !existingSegments?.length) {
+  const allExistingClosed =
+    existingSegments?.length && existingSegments.every((seg) => isClosedSegment(seg));
+  if (replaceWithNewOnly && existingSegments?.length && !allExistingClosed) {
+    result = [...existingSegments, points];
+  } else if (replaceWithNewOnly || !existingSegments?.length) {
     result = points;
   } else if (appendAsNewSegment) {
     result = [...existingSegments, points];
