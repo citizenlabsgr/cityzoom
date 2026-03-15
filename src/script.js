@@ -1093,7 +1093,10 @@ function onMapMouseMove(e, mapId) {
       ? existingSegments[existingSegments.length - 1]
       : existingSegments;
   const hasExisting =
-    lastSegment && lastSegment.length >= 2 && !drawState.startedAfterCompletedShape;
+    drawState.tool === "line" &&
+    lastSegment &&
+    lastSegment.length >= 2 &&
+    !drawState.startedAfterCompletedShape;
   if (hasExisting) {
     const connectionFrom = lastSegment[lastSegment.length - 1];
     const connectionTo = drawState.points.length === 0 ? e.latlng : drawState.points[0];
