@@ -157,8 +157,7 @@ function addLocationButtonToSearch(map) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "leaflet-control-location-btn";
-  btn.title = "Set map to my location";
-  btn.setAttribute("aria-label", "Set map to my location");
+  btn.title = "Use my location";
   btn.innerHTML = LOCATION_ICON;
   L.DomEvent.disableClickPropagation(btn);
   L.DomEvent.on(btn, "click", function () {
@@ -213,7 +212,7 @@ const DrawLineControl = L.Control.extend({
     const drawBtn = L.DomUtil.create("button", "leaflet-draw-line-btn", toolBar);
     drawBtn.type = "button";
     drawBtn.id = this._mapId === 1 ? "drawBox1" : "drawBox2";
-    drawBtn.title = "Draw line / polygon";
+    drawBtn.title = "Draw lines";
     drawBtn.innerHTML = LINE_SEGMENT_ICON;
     const circleBtn = L.DomUtil.create("button", "leaflet-draw-line-btn", toolBar);
     circleBtn.type = "button";
