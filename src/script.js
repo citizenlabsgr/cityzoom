@@ -1030,14 +1030,30 @@ function exitDrawMode() {
   updateClearButtons();
 }
 
-document.addEventListener("keydown", function (e) {
-  if (e.key !== "Escape" || !drawState.mapId) return;
-  if (drawState.tool === "circle") {
-    cancelDraw();
-    return;
-  }
-  finishDraw(drawState.mapId);
-});
+document.addEventListener(
+  "keydown",
+  function (e) {
+    if (e.key === " " || e.key === "Spacebar") {
+      const active = document.activeElement;
+      const isTextInput =
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable);
+      if (!isTextInput) {
+        e.preventDefault();
+      }
+      return;
+    }
+    if (e.key !== "Escape" || !drawState.mapId) return;
+    if (drawState.tool === "circle") {
+      cancelDraw();
+      return;
+    }
+    finishDraw(drawState.mapId);
+  },
+  true
+);
 
 document.getElementById("drawBox1").addEventListener("click", function () {
   if (drawState.mapId === 1) {

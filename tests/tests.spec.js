@@ -54,6 +54,25 @@ test.describe("Home page", () => {
     await expect(searchInput).toHaveValue("Chicago");
   });
 
+  test("space key on top map does not cause layout shift or scroll", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const scrollBefore = await page.evaluate(() => ({
+      x: window.scrollX,
+      y: window.scrollY,
+    }));
+    await page.locator("#map1").click({ position: { x: 150, y: 150 } });
+    await page.keyboard.press("Space");
+    const scrollAfter = await page.evaluate(() => ({
+      x: window.scrollX,
+      y: window.scrollY,
+    }));
+    expect(scrollAfter.x).toBe(scrollBefore.x);
+    expect(scrollAfter.y).toBe(scrollBefore.y);
+  });
+
   test("Copy URL resets to Copy URL when drawing fragment changes", async ({
     page,
   }) => {
