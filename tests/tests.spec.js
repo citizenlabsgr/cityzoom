@@ -73,6 +73,42 @@ test.describe("Home page", () => {
     expect(scrollAfter.y).toBe(scrollBefore.y);
   });
 
+  test("map tap on mobile does not scroll controls under the header", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const layoutBefore = await page.evaluate(() => {
+      const control = document.querySelector("#map1 .leaflet-top");
+      const header = document.getElementById("header");
+      const controlRect = control.getBoundingClientRect();
+      const headerRect = header.getBoundingClientRect();
+      return {
+        scrollY: window.scrollY,
+        controlTop: controlRect.top,
+        headerBottom: headerRect.bottom,
+      };
+    });
+    expect(layoutBefore.controlTop).toBeGreaterThanOrEqual(layoutBefore.headerBottom);
+    await page.locator("#map1").click({ position: { x: 150, y: 200 } });
+    await page.waitForTimeout(100);
+    const layoutAfter = await page.evaluate(() => {
+      const control = document.querySelector("#map1 .leaflet-top");
+      const header = document.getElementById("header");
+      const controlRect = control.getBoundingClientRect();
+      const headerRect = header.getBoundingClientRect();
+      return {
+        scrollY: window.scrollY,
+        controlTop: controlRect.top,
+        headerBottom: headerRect.bottom,
+      };
+    });
+    expect(layoutAfter.scrollY).toBe(layoutBefore.scrollY);
+    expect(layoutAfter.controlTop).toBe(layoutBefore.controlTop);
+    expect(layoutAfter.controlTop).toBeGreaterThanOrEqual(layoutAfter.headerBottom);
+  });
+
   test("Copy URL resets to Copy URL when drawing fragment changes", async ({
     page,
   }) => {

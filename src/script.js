@@ -136,6 +136,26 @@ let currentBasemap = [initialBasemaps.map1, initialBasemaps.map2];
 var map1 = L.map("map1").setView(initialCenter1, initialZoom);
 var map2 = L.map("map2").setView(initialCenter2, initialZoom);
 
+function invalidateMapSizes() {
+  map1.invalidateSize();
+  map2.invalidateSize();
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", invalidateMapSizes);
+}
+
+// iOS Safari scrolls the page when a map receives focus; keep controls under the header.
+document.addEventListener(
+  "focusin",
+  function (e) {
+    if (e.target.closest && e.target.closest(".leaflet-container")) {
+      window.scrollTo(0, 0);
+    }
+  },
+  true
+);
+
 L.control.scale().addTo(map1);
 L.control.scale().addTo(map2);
 

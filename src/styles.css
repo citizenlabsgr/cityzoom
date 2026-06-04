@@ -1,7 +1,18 @@
-body,
+:root {
+  --app-height: 100vh;
+  --app-height: 100svh;
+}
+
 html {
   height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: var(--app-height);
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: black;
   font-family: Arial, sans-serif;
 }
@@ -186,7 +197,7 @@ html {
 /* Styles for screens with width greater than height (landscape) */
 @media (min-aspect-ratio: 1/1) {
   .map-wrapper {
-    height: calc(100vh - 70px);
+    height: calc(var(--app-height) - 70px);
     width: 50%;
     float: left;
     margin-top: 45px;
@@ -207,7 +218,7 @@ html {
 /* Styles for screens with height greater than width (portrait) */
 @media (max-aspect-ratio: 1/1) {
   .map-wrapper {
-    height: calc((100vh - 70px) / 2);
+    height: calc((var(--app-height) - 70px) / 2);
     width: 100%;
   }
   #wrapper1 {
@@ -222,7 +233,7 @@ html {
 /* Portrait + small (phone): thin footer bar, so maps extend to avoid a large black gap */
 @media (max-aspect-ratio: 1/1) and (max-width: 480px) {
   .map-wrapper {
-    height: calc((100vh - 50px) / 2); /* 45px header + 5px footer */
+    height: calc((var(--app-height) - 50px) / 2); /* 45px header + 5px footer */
   }
 }
 
