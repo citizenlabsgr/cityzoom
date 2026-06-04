@@ -23,7 +23,7 @@ endif
 
 .PHONY: dev
 dev: install
-	npx --yes nodemon --ext js,json,html,css --watch . --exec "clear; make all; echo"
+	npx --yes nodemon --ext js,json,html,css --watch . --exec "clear; make all; printf '\n🚀\n\n'"
 
 .PHONY: run
 run:
