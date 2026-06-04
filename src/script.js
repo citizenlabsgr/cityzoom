@@ -231,6 +231,24 @@ const originalButtonText = "Copy URL";
 // Randomize location from examples (data.json). Use lat1 to avoid picking the current example.
 const locationExamplesPromise = fetch("src/data.json").then((r) => r.json());
 
+function cityzoomLinkToLocalPath(linkUrl) {
+  const u = new URL(linkUrl);
+  return u.pathname + u.search + u.hash;
+}
+
+function lat1FromCityzoomLink(linkUrl) {
+  const lat1 = new URL(linkUrl).searchParams.get("lat1");
+  if (lat1 == null) return null;
+  return Math.round(parseFloat(lat1) * 1e5) / 1e5;
+}
+
+function applyBasemapParamsToPath(localPath) {
+  const u = new URL(localPath, window.location.origin);
+  if (currentBasemap[0] === "esri") u.searchParams.set("sat1", "true");
+  if (currentBasemap[1] === "esri") u.searchParams.set("sat2", "true");
+  return u.pathname + u.search + u.hash;
+}
+
 function randomizeLocation() {
   locationExamplesPromise.then(function (examples) {
     if (!examples.length) return;
@@ -240,21 +258,13 @@ function randomizeLocation() {
     const others =
       currentLat1 != null
         ? examples.filter(function (e) {
-            return round5(e.lat1) !== currentLat1;
+            const lat1 = lat1FromCityzoomLink(e.url);
+            return lat1 == null || lat1 !== currentLat1;
           })
         : examples;
     if (!others.length) return;
     const ex = others[Math.floor(Math.random() * others.length)];
-    const params = new URLSearchParams({
-      zoom: ex.zoom,
-      lat1: ex.lat1,
-      lon1: ex.lon1,
-      lat2: ex.lat2,
-      lon2: ex.lon2,
-    });
-    if (currentBasemap[0] === "esri") params.set("sat1", "true");
-    if (currentBasemap[1] === "esri") params.set("sat2", "true");
-    const url = window.location.pathname + "?" + params.toString();
+    const url = applyBasemapParamsToPath(cityzoomLinkToLocalPath(ex.url));
     try {
       sessionStorage.setItem("cityzoom_randomize_toast", ex.name);
     } catch (_) {}

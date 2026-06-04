@@ -211,6 +211,29 @@ test.describe("Home page", () => {
     await expect(page.locator("#toast")).toContainText(" vs. ");
     await expect(page).not.toHaveURL(/#/);
   });
+
+  test("randomize loads a cityzoom.link example as a local URL", async ({ page }) => {
+    const examples = await (await page.request.get("/src/data.json")).json();
+    const examplePaths = examples.map((example) => {
+      const url = new URL(example.url);
+      return url.pathname + url.search + url.hash;
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#randomizeButton", { state: "visible" });
+    await Promise.all([
+      page.waitForURL(/\?zoom=.+&lat1=/, { timeout: 10000 }),
+      page.locator("#randomizeButton").click(),
+    ]);
+
+    const current = new URL(page.url());
+    expect(current.hostname).toBe("localhost");
+    expect(current.pathname).toBe("/");
+    expect(examplePaths).toContain(current.pathname + current.search + current.hash);
+
+    const toastName = (await page.locator("#toast").textContent())?.trim();
+    expect(examples.some((example) => example.name === toastName)).toBe(true);
+  });
 });
 
 test.describe("Circle tool", () => {
