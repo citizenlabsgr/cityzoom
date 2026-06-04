@@ -5,12 +5,10 @@ function syncZoom(level) {
 
 let applyingHistory = false;
 
-function syncMaps() {
-  if (applyingHistory) return;
+function buildUrlParams() {
   const center1 = map1.getCenter();
   const center2 = map2.getCenter();
   const zoom = map1.getZoom();
-
   const params = new URLSearchParams({
     zoom: zoom,
     lat1: center1.lat.toFixed(5),
@@ -18,10 +16,20 @@ function syncMaps() {
     lat2: center2.lat.toFixed(5),
     lon2: center2.lng.toFixed(5),
   });
+  if (currentBasemap[0] !== DEFAULT_BASEMAP) params.set("base1", currentBasemap[0]);
+  if (currentBasemap[1] !== DEFAULT_BASEMAP) params.set("base2", currentBasemap[1]);
+  return params;
+}
 
+function pushMapUrl() {
   const hash = window.location.hash || "";
-  history.pushState(null, "", "?" + params.toString() + hash);
+  history.pushState(null, "", "?" + buildUrlParams().toString() + hash);
   dismissCopiedState();
+}
+
+function syncMaps() {
+  if (applyingHistory) return;
+  pushMapUrl();
 }
 
 function copyUrl() {
@@ -73,6 +81,47 @@ const initialCenter2 =
 
 const initialZoom = urlParams.has("zoom") ? parseInt(urlParams.get("zoom")) : 13;
 
+const DEFAULT_BASEMAP = "osm";
+
+const BASEMAP_CONFIG = {
+  osm: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    options: {
+      attribution:
+        '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+  },
+  esri: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    options: {
+      attribution:
+        "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, USDA, USGS, AeroGRID, IGN, and the GIS User Community",
+      maxZoom: 19,
+    },
+  },
+};
+
+function parseBasemapParams(params) {
+  const legacyBasemap = params.get("basemap");
+  const legacyFallback =
+    legacyBasemap && BASEMAP_CONFIG[legacyBasemap] ? legacyBasemap : null;
+  if (params.get("satellite") === "1") {
+    return { map1: "esri", map2: "esri" };
+  }
+  function forMap(paramName, legacyParamName) {
+    const value = params.get(paramName);
+    if (value && BASEMAP_CONFIG[value]) return value;
+    const legacyValue = params.get(legacyParamName);
+    if (legacyValue && BASEMAP_CONFIG[legacyValue]) return legacyValue;
+    if (legacyFallback) return legacyFallback;
+    return DEFAULT_BASEMAP;
+  }
+  return { map1: forMap("base1", "basemap1"), map2: forMap("base2", "basemap2") };
+}
+
+const initialBasemaps = parseBasemapParams(urlParams);
+let currentBasemap = [initialBasemaps.map1, initialBasemaps.map2];
+
 // Initialize the maps
 
 var map1 = L.map("map1").setView(initialCenter1, initialZoom);
@@ -81,13 +130,69 @@ var map2 = L.map("map2").setView(initialCenter2, initialZoom);
 L.control.scale().addTo(map1);
 L.control.scale().addTo(map2);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-}).addTo(map1);
+const basemapLayers = {};
+Object.keys(BASEMAP_CONFIG).forEach(function (id) {
+  const cfg = BASEMAP_CONFIG[id];
+  basemapLayers[id] = [
+    L.tileLayer(cfg.url, cfg.options),
+    L.tileLayer(cfg.url, cfg.options),
+  ];
+});
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-}).addTo(map2);
+function applyBasemapToMap(mapIndex, id) {
+  if (!BASEMAP_CONFIG[id]) id = DEFAULT_BASEMAP;
+  const map = mapIndex === 0 ? map1 : map2;
+  Object.keys(basemapLayers).forEach(function (basemapId) {
+    const layer = basemapLayers[basemapId][mapIndex];
+    if (map.hasLayer(layer)) map.removeLayer(layer);
+  });
+  basemapLayers[id][mapIndex].addTo(map);
+}
+
+function setBasemap(mapIndex, id) {
+  if (!BASEMAP_CONFIG[id]) id = DEFAULT_BASEMAP;
+  currentBasemap[mapIndex] = id;
+  applyBasemapToMap(mapIndex, id);
+  const selectId = mapIndex === 0 ? "basemapSelect1" : "basemapSelect2";
+  const select = document.getElementById(selectId);
+  if (select) select.value = id;
+}
+
+const BasemapControl = L.Control.extend({
+  options: { position: "bottomright" },
+  initialize: function (mapIndex) {
+    this._mapIndex = mapIndex;
+  },
+  onAdd: function () {
+    const container = L.DomUtil.create("div", "leaflet-basemap-control leaflet-bar");
+    L.DomEvent.disableClickPropagation(container);
+    const select = L.DomUtil.create("select", "leaflet-basemap-select", container);
+    select.id = this._mapIndex === 0 ? "basemapSelect1" : "basemapSelect2";
+    select.title = "Basemap";
+    select.setAttribute("aria-label", "Basemap");
+    [
+      ["osm", "Map"],
+      ["esri", "Satellite"],
+    ].forEach(function ([value, label]) {
+      const option = L.DomUtil.create("option", "", select);
+      option.value = value;
+      option.textContent = label;
+    });
+    select.value = currentBasemap[this._mapIndex];
+    const mapIndex = this._mapIndex;
+    L.DomEvent.on(select, "change", function () {
+      setBasemap(mapIndex, select.value);
+      pushMapUrl();
+    });
+    return container;
+  },
+});
+
+currentBasemap.forEach(function (id, mapIndex) {
+  applyBasemapToMap(mapIndex, id);
+});
+map1.addControl(new BasemapControl(0));
+map2.addControl(new BasemapControl(1));
 
 // Initialize the copy button
 
@@ -118,6 +223,8 @@ function randomizeLocation() {
       lat2: ex.lat2,
       lon2: ex.lon2,
     });
+    if (currentBasemap[0] !== DEFAULT_BASEMAP) params.set("base1", currentBasemap[0]);
+    if (currentBasemap[1] !== DEFAULT_BASEMAP) params.set("base2", currentBasemap[1]);
     const url = window.location.pathname + "?" + params.toString();
     try {
       sessionStorage.setItem("cityzoom_randomize_toast", ex.name);
@@ -1331,6 +1438,9 @@ function applyUrlToMaps() {
     map2.setView([lat2, lon2], zoom);
     applyingHistory = false;
   }
+  const wantBasemaps = parseBasemapParams(p);
+  if (wantBasemaps.map1 !== currentBasemap[0]) setBasemap(0, wantBasemaps.map1);
+  if (wantBasemaps.map2 !== currentBasemap[1]) setBasemap(1, wantBasemaps.map2);
   applyFragmentToMaps();
   updateClearButtons();
   dismissCopiedState();

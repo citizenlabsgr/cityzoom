@@ -90,6 +90,61 @@ html {
   }
 }
 
+#header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: -10px; /* pull right to align with map edge (header padding 20px − map border 10px) */
+}
+
+/* Basemap selector on each map — match Leaflet scale control styling */
+.leaflet-basemap-control.leaflet-bar {
+  background: rgba(255, 255, 255, 0.65);
+  border: 2px solid #777;
+  border-radius: 4px;
+  box-shadow: none;
+  background-clip: padding-box;
+}
+
+.leaflet-touch .leaflet-basemap-control.leaflet-bar {
+  box-shadow: none;
+  border: 2px solid #777;
+}
+
+.leaflet-basemap-select {
+  display: block;
+  border: none;
+  background: transparent;
+  font:
+    11px/1.1 "Helvetica Neue",
+    Arial,
+    Helvetica,
+    sans-serif;
+  color: #333;
+  padding: 2px 5px 1px;
+  cursor: pointer;
+  border-radius: 2px;
+  max-width: 130px;
+}
+
+.leaflet-basemap-select:focus {
+  outline: none;
+}
+
+.leaflet-touch .leaflet-basemap-select {
+  font-size: 11px;
+  padding: 2px 5px 1px;
+  max-width: 140px;
+}
+
+@media (max-width: 550px) {
+  .leaflet-basemap-select {
+    max-width: 110px;
+    font-size: 11px;
+    padding: 2px 5px 1px;
+  }
+}
+
 #copyButton {
   background: black;
   color: white;
@@ -102,7 +157,6 @@ html {
   transition:
     background 0.3s,
     border-color 0.3s;
-  margin-right: -10px; /* pull right to align with map edge (header padding 20px − map border 10px) */
 }
 
 #copyButton:hover {

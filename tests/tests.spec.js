@@ -128,6 +128,28 @@ test.describe("Home page", () => {
     await expect(page).toHaveURL(/zoom=11/);
   });
 
+  test("basemap dropdown updates URL and layer", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const select1 = page.locator("#basemapSelect1");
+    const select2 = page.locator("#basemapSelect2");
+    await expect(select1).toHaveValue("osm");
+    await expect(select2).toHaveValue("osm");
+    await select1.selectOption("esri");
+    await expect(page).toHaveURL(/base1=esri/);
+    await select1.selectOption("osm");
+    await expect(page).not.toHaveURL(/base1=/);
+    await select2.selectOption("esri");
+    await expect(page).toHaveURL(/base2=esri/);
+  });
+
+  test("legacy satellite=1 URL selects Esri basemap", async ({ page }) => {
+    await page.goto("/?satellite=1");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await expect(page.locator("#basemapSelect1")).toHaveValue("esri");
+    await expect(page.locator("#basemapSelect2")).toHaveValue("esri");
+  });
+
   test("back button restores previous map view", async ({ page }) => {
     await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83");
     await page.waitForSelector("#map1", { state: "attached" });
@@ -348,7 +370,7 @@ test.describe("Map annotations", { tag: "@snapshot" }, () => {
   for (const { name, width, height } of VIEWPORTS) {
     test(`snapshot at ${name} viewport (${width}x${height})`, async ({ page }) => {
       await page.setViewportSize({ width, height });
-      await page.goto("/");
+      await page.goto("/?base2=esri");
       await page.waitForSelector("#map1", { state: "attached" });
       const map1 = page.locator("#map1");
       const map2 = page.locator("#map2");
