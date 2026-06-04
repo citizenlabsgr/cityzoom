@@ -136,11 +136,11 @@ test.describe("Home page", () => {
     await expect(select1).toHaveValue("osm");
     await expect(select2).toHaveValue("osm");
     await select1.selectOption("esri");
-    await expect(page).toHaveURL(/base1=esri/);
+    await expect(page).toHaveURL(/sat1=true/);
     await select1.selectOption("osm");
-    await expect(page).not.toHaveURL(/base1=/);
+    await expect(page).not.toHaveURL(/sat1=/);
     await select2.selectOption("esri");
-    await expect(page).toHaveURL(/base2=esri/);
+    await expect(page).toHaveURL(/sat2=true/);
   });
 
   test("legacy satellite=1 URL selects Esri basemap", async ({ page }) => {
@@ -370,7 +370,7 @@ test.describe("Map annotations", { tag: "@snapshot" }, () => {
   for (const { name, width, height } of VIEWPORTS) {
     test(`snapshot at ${name} viewport (${width}x${height})`, async ({ page }) => {
       await page.setViewportSize({ width, height });
-      await page.goto("/?base2=esri");
+      await page.goto("/?sat2=true");
       await page.waitForSelector("#map1", { state: "attached" });
       const map1 = page.locator("#map1");
       const map2 = page.locator("#map2");

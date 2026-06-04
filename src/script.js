@@ -16,8 +16,8 @@ function buildUrlParams() {
     lat2: center2.lat.toFixed(5),
     lon2: center2.lng.toFixed(5),
   });
-  if (currentBasemap[0] !== DEFAULT_BASEMAP) params.set("base1", currentBasemap[0]);
-  if (currentBasemap[1] !== DEFAULT_BASEMAP) params.set("base2", currentBasemap[1]);
+  if (currentBasemap[0] === "esri") params.set("sat1", "true");
+  if (currentBasemap[1] === "esri") params.set("sat2", "true");
   return params;
 }
 
@@ -101,6 +101,11 @@ const BASEMAP_CONFIG = {
   },
 };
 
+function isSatParamEnabled(params, name) {
+  const value = params.get(name);
+  return value === "true" || value === "1";
+}
+
 function parseBasemapParams(params) {
   const legacyBasemap = params.get("basemap");
   const legacyFallback =
@@ -108,7 +113,8 @@ function parseBasemapParams(params) {
   if (params.get("satellite") === "1") {
     return { map1: "esri", map2: "esri" };
   }
-  function forMap(paramName, legacyParamName) {
+  function forMap(satParamName, paramName, legacyParamName) {
+    if (isSatParamEnabled(params, satParamName)) return "esri";
     const value = params.get(paramName);
     if (value && BASEMAP_CONFIG[value]) return value;
     const legacyValue = params.get(legacyParamName);
@@ -116,7 +122,10 @@ function parseBasemapParams(params) {
     if (legacyFallback) return legacyFallback;
     return DEFAULT_BASEMAP;
   }
-  return { map1: forMap("base1", "basemap1"), map2: forMap("base2", "basemap2") };
+  return {
+    map1: forMap("sat1", "base1", "basemap1"),
+    map2: forMap("sat2", "base2", "basemap2"),
+  };
 }
 
 const initialBasemaps = parseBasemapParams(urlParams);
@@ -223,8 +232,8 @@ function randomizeLocation() {
       lat2: ex.lat2,
       lon2: ex.lon2,
     });
-    if (currentBasemap[0] !== DEFAULT_BASEMAP) params.set("base1", currentBasemap[0]);
-    if (currentBasemap[1] !== DEFAULT_BASEMAP) params.set("base2", currentBasemap[1]);
+    if (currentBasemap[0] === "esri") params.set("sat1", "true");
+    if (currentBasemap[1] === "esri") params.set("sat2", "true");
     const url = window.location.pathname + "?" + params.toString();
     try {
       sessionStorage.setItem("cityzoom_randomize_toast", ex.name);
