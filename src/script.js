@@ -418,6 +418,8 @@ const DrawLineControl = L.Control.extend({
       "leaflet-draw-clear-bar leaflet-bar",
       container
     );
+    clearBar.id = this._mapId === 1 ? "clearBar1" : "clearBar2";
+    clearBar.style.display = "none";
     const clearBtn = L.DomUtil.create(
       "button",
       "leaflet-draw-clear leaflet-draw-line-btn",
@@ -427,7 +429,6 @@ const DrawLineControl = L.Control.extend({
     clearBtn.id = this._mapId === 1 ? "clearBox1" : "clearBox2";
     clearBtn.title = "Clear annotations";
     clearBtn.innerHTML = TRASH_ICON;
-    clearBtn.style.display = "none";
     return container;
   },
 });
@@ -1620,10 +1621,10 @@ map1.on("dblclick", (e) => onMapDblClick(e, 1));
 map2.on("dblclick", (e) => onMapDblClick(e, 2));
 
 function updateClearButtons() {
-  document.getElementById("clearBox1").style.display =
-    line1 || circles1.length ? "block" : "none";
-  document.getElementById("clearBox2").style.display =
-    line2 || circles2.length ? "block" : "none";
+  document.getElementById("clearBar1").style.display =
+    line1 || circles1.length ? "" : "none";
+  document.getElementById("clearBar2").style.display =
+    line2 || circles2.length ? "" : "none";
 }
 
 document.getElementById("clearBox1").addEventListener("click", function () {
