@@ -451,6 +451,70 @@ body {
   animation: leaflet-draw-dash 0.6s linear infinite;
 }
 
+.leaflet-draw-pulse-icon {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-draw-pulse {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.leaflet-draw-pulse-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: #0088ff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.leaflet-draw-pulse-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 2px solid #0088ff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  animation: leaflet-draw-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes leaflet-draw-pulse-ring {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.leaflet-draw-pulse-ring-reverse {
+  animation: leaflet-draw-pulse-ring-reverse 1.6s ease-out infinite;
+}
+
+@keyframes leaflet-draw-pulse-ring-reverse {
+  0% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.55);
+    opacity: 0.85;
+  }
+}
+
 .toast {
   position: fixed;
   left: 50%;
