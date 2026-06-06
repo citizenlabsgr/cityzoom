@@ -337,6 +337,54 @@ setTimeout(function () {
 // Close-to-point threshold in pixels to complete the circuit
 const CLOSE_POINT_PX = 15;
 
+const TOUCH_DRAW_TOAST_MS = 6000;
+
+function isTouchDrawDevice() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+const touchPulseIcon = L.divIcon({
+  className: "leaflet-draw-pulse-icon",
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+  html:
+    '<div class="leaflet-draw-pulse">' +
+    '<span class="leaflet-draw-pulse-dot"></span>' +
+    '<span class="leaflet-draw-pulse-ring"></span>' +
+    "</div>",
+});
+
+const touchClosePulseIcon = L.divIcon({
+  className: "leaflet-draw-pulse-icon",
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+  html:
+    '<div class="leaflet-draw-pulse leaflet-draw-pulse-close">' +
+    '<span class="leaflet-draw-pulse-dot"></span>' +
+    '<span class="leaflet-draw-pulse-ring leaflet-draw-pulse-ring-reverse"></span>' +
+    "</div>",
+});
+
+const MIN_SEGMENTS_TO_CLOSE = 2;
+const DRAW_TAP_COOLDOWN_MS = 450;
+const MIN_TAP_DISTANCE_PX = 8;
+const MIN_CIRCLE_RADIUS_M = 20;
+
+function showTouchDrawToast(message) {
+  if (!isTouchDrawDevice()) return;
+  showToast(message, undefined, TOUCH_DRAW_TOAST_MS);
+}
+
+function touchDrawLineHint(pointCount) {
+  if (pointCount === 0) return "Tap the map to start drawing.";
+  if (pointCount <= 2) return "Tap to add the next point.";
+  return "Tap the first point to close the shape.";
+}
+
+function touchDrawCircleHint(hasCenter) {
+  return hasCenter ? "Tap to set the circle radius" : "Tap to place the circle center";
+}
+
 // Line segment, circle, and trash icons for draw control
 const LINE_SEGMENT_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-line-icon"><circle cx="6" cy="18" r="1.5" fill="currentColor"/><circle cx="18" cy="6" r="1.5" fill="currentColor"/><line x1="6" y1="18" x2="18" y2="6"/></svg>';
@@ -886,7 +934,7 @@ function setCircles(map, circleVar, circlesData) {
 
 let toastTimeout = null;
 
-function showToast(message, type) {
+function showToast(message, type, durationMs) {
   const el = document.getElementById("toast");
   if (!el) return;
   el.textContent = message;
@@ -897,7 +945,17 @@ function showToast(message, type) {
   toastTimeout = setTimeout(function () {
     el.classList.remove("visible", "error");
     toastTimeout = null;
-  }, 3000);
+  }, durationMs ?? 3000);
+}
+
+function dismissToast() {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.classList.remove("visible", "error");
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
 }
 
 function applyFragmentToMaps() {
@@ -947,12 +1005,174 @@ let drawState = {
   segmentPreviewLayer: null,
   connectionPreviewBorderLayer: null,
   connectionPreviewLayer: null,
+  closePulseMarker: null,
   closeIndicatorLayer: null,
+  touchPendingMarker: null,
+  lastTapAt: 0,
+  acceptingTap: false,
   startedAfterCompletedShape: false,
   circleCenter: null,
   circlePreviewLayer: null,
   circlePreviewBorderLayer: null,
 };
+
+function removeTouchPendingIndicator(map) {
+  if (drawState.touchPendingMarker) {
+    map.removeLayer(drawState.touchPendingMarker);
+    drawState.touchPendingMarker = null;
+  }
+}
+
+function updateTouchPendingIndicator(map, latlng) {
+  removeTouchPendingIndicator(map);
+  drawState.touchPendingMarker = L.marker(latlng, {
+    icon: touchPulseIcon,
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 1000,
+  }).addTo(map);
+}
+
+function syncTouchPendingIndicator(map) {
+  if (!isTouchDrawDevice()) {
+    removeTouchPendingIndicator(map);
+    return;
+  }
+  if (drawState.tool === "line" && drawState.points.length >= 1) {
+    updateTouchPendingIndicator(map, drawState.points[drawState.points.length - 1]);
+    return;
+  }
+  if (drawState.tool === "circle" && drawState.circleCenter) {
+    updateTouchPendingIndicator(map, drawState.circleCenter);
+    return;
+  }
+  removeTouchPendingIndicator(map);
+}
+
+function removeClosePulseIndicator(map) {
+  if (drawState.closePulseMarker) {
+    map.removeLayer(drawState.closePulseMarker);
+    drawState.closePulseMarker = null;
+  }
+}
+
+function removeDesktopCloseIndicator(map) {
+  if (drawState.closeIndicatorLayer) {
+    map.removeLayer(drawState.closeIndicatorLayer);
+    drawState.closeIndicatorLayer = null;
+  }
+}
+
+function removeCloseHoverState() {
+  document.getElementById("wrapper1").classList.remove("within-close-range");
+  document.getElementById("wrapper2").classList.remove("within-close-range");
+}
+
+function syncClosePulseIndicator(map) {
+  if (!isTouchDrawDevice()) {
+    removeClosePulseIndicator(map);
+    return;
+  }
+  const segmentCount = drawState.points.length - 1;
+  if (drawState.tool !== "line" || segmentCount < MIN_SEGMENTS_TO_CLOSE) {
+    removeClosePulseIndicator(map);
+    return;
+  }
+  const first = drawState.points[0];
+  if (drawState.closePulseMarker) {
+    drawState.closePulseMarker.setLatLng(first);
+    return;
+  }
+  drawState.closePulseMarker = L.marker(first, {
+    icon: touchClosePulseIcon,
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 999,
+  }).addTo(map);
+}
+
+function syncDrawIndicators(map) {
+  syncTouchPendingIndicator(map);
+  syncClosePulseIndicator(map);
+}
+
+function setMapDrawInteraction(mapId, active) {
+  if (!isTouchDrawDevice() || !mapId) return;
+  const map = mapId === 1 ? map1 : map2;
+  if (active) map.doubleClickZoom.disable();
+  else map.doubleClickZoom.enable();
+}
+
+function shouldAcceptDrawTap(e, map) {
+  const now = Date.now();
+  if (isTouchDrawDevice() && now - drawState.lastTapAt < DRAW_TAP_COOLDOWN_MS) {
+    return false;
+  }
+  if (drawState.tool === "line" && drawState.points.length > 0) {
+    const last = drawState.points[drawState.points.length - 1];
+    const p0 = map.latLngToContainerPoint(last);
+    const p1 = map.latLngToContainerPoint(e.latlng);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    if (dx * dx + dy * dy < MIN_TAP_DISTANCE_PX * MIN_TAP_DISTANCE_PX) {
+      return false;
+    }
+  }
+  if (drawState.tool === "circle" && drawState.circleCenter) {
+    const p0 = map.latLngToContainerPoint(drawState.circleCenter);
+    const p1 = map.latLngToContainerPoint(e.latlng);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    if (dx * dx + dy * dy < MIN_TAP_DISTANCE_PX * MIN_TAP_DISTANCE_PX) {
+      return false;
+    }
+  }
+  drawState.lastTapAt = now;
+  return true;
+}
+
+function processDrawTap(e, mapId) {
+  if (drawState.mapId !== mapId) return;
+  if (drawState.acceptingTap) return;
+  const map = mapId === 1 ? map1 : map2;
+  if (!shouldAcceptDrawTap(e, map)) return;
+  drawState.acceptingTap = true;
+  try {
+    if (isTouchDrawDevice()) dismissToast();
+    if (drawState.tool === "circle") {
+      if (!drawState.circleCenter) {
+        drawState.circleCenter = e.latlng;
+        syncDrawIndicators(map);
+        showTouchDrawToast(touchDrawCircleHint(true));
+        return;
+      }
+      const radius = Math.max(
+        MIN_CIRCLE_RADIUS_M,
+        drawState.circleCenter.distanceTo(e.latlng)
+      );
+      finishCircleDraw(mapId, drawState.circleCenter, radius);
+      return;
+    }
+    if (drawState.points.length >= 2) {
+      const first = drawState.points[0];
+      const p0 = map.latLngToContainerPoint(first);
+      const p1 = map.latLngToContainerPoint(e.latlng);
+      const dx = p1.x - p0.x;
+      const dy = p1.y - p0.y;
+      if (dx * dx + dy * dy <= CLOSE_POINT_PX * CLOSE_POINT_PX) {
+        drawState.points.push(L.latLng(first.lat, first.lng));
+        finishDraw(mapId);
+        return;
+      }
+    }
+    drawState.points.push(e.latlng);
+    updatePreview(map, drawState.points);
+    syncDrawIndicators(map);
+    showTouchDrawToast(touchDrawLineHint(drawState.points.length));
+  } finally {
+    drawState.acceptingTap = false;
+  }
+}
 
 function startDraw(mapId, tool) {
   const t = tool || "line";
@@ -968,7 +1188,11 @@ function startDraw(mapId, tool) {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closePulseMarker: null,
     closeIndicatorLayer: null,
+    touchPendingMarker: null,
+    lastTapAt: 0,
+    acceptingTap: false,
     startedAfterCompletedShape,
     circleCenter: null,
     circlePreviewLayer: null,
@@ -988,6 +1212,11 @@ function startDraw(mapId, tool) {
     .classList.toggle("active", mapId === 2 && t === "circle");
   document.getElementById("wrapper1").classList.toggle("draw-mode", mapId === 1);
   document.getElementById("wrapper2").classList.toggle("draw-mode", mapId === 2);
+  if (isTouchDrawDevice()) {
+    if (t === "line") showTouchDrawToast(touchDrawLineHint(0));
+    else if (t === "circle") showTouchDrawToast(touchDrawCircleHint(false));
+  }
+  setMapDrawInteraction(mapId, true);
 }
 
 function removeSegmentPreview(map) {
@@ -1013,12 +1242,9 @@ function removeConnectionPreview(map) {
 }
 
 function removeCloseIndicator(map) {
-  if (drawState.closeIndicatorLayer) {
-    map.removeLayer(drawState.closeIndicatorLayer);
-    drawState.closeIndicatorLayer = null;
-  }
-  document.getElementById("wrapper1").classList.remove("within-close-range");
-  document.getElementById("wrapper2").classList.remove("within-close-range");
+  removeDesktopCloseIndicator(map);
+  removeClosePulseIndicator(map);
+  removeCloseHoverState();
 }
 
 function removeCirclePreview(map) {
@@ -1033,13 +1259,17 @@ function removeCirclePreview(map) {
 }
 
 function cancelDraw() {
-  const map = drawState.mapId === 1 ? map1 : map2;
+  const mapId = drawState.mapId;
+  const map = mapId === 1 ? map1 : map2;
   if (drawState.previewBorderLayer) map.removeLayer(drawState.previewBorderLayer);
   if (drawState.previewLayer) map.removeLayer(drawState.previewLayer);
   removeSegmentPreview(map);
   removeConnectionPreview(map);
   removeCloseIndicator(map);
-  if (drawState.mapId) removeCirclePreview(map);
+  if (drawState.mapId) {
+    removeTouchPendingIndicator(map);
+    removeCirclePreview(map);
+  }
   drawState = {
     mapId: null,
     tool: "line",
@@ -1050,7 +1280,11 @@ function cancelDraw() {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closePulseMarker: null,
     closeIndicatorLayer: null,
+    touchPendingMarker: null,
+    lastTapAt: 0,
+    acceptingTap: false,
     startedAfterCompletedShape: false,
     circleCenter: null,
     circlePreviewLayer: null,
@@ -1062,6 +1296,7 @@ function cancelDraw() {
   document.getElementById("circleBox2").classList.remove("active");
   document.getElementById("wrapper1").classList.remove("draw-mode");
   document.getElementById("wrapper2").classList.remove("draw-mode");
+  setMapDrawInteraction(mapId, false);
 }
 
 function updatePreview(map, points) {
@@ -1111,6 +1346,7 @@ function finishDraw(mapId) {
   removeSegmentPreview(map);
   removeConnectionPreview(map);
   removeCloseIndicator(map);
+  removeTouchPendingIndicator(map);
   if (mapId === 1) {
     setLine(map1, "line1", result);
     updateFragment(
@@ -1151,6 +1387,11 @@ function finishCircleDraw(mapId, center, radius) {
 }
 
 function exitDrawMode() {
+  const mapId = drawState.mapId;
+  const map = mapId === 1 ? map1 : mapId === 2 ? map2 : null;
+  if (map) removeTouchPendingIndicator(map);
+  setMapDrawInteraction(mapId, false);
+  if (isTouchDrawDevice()) dismissToast();
   drawState = {
     mapId: null,
     tool: "line",
@@ -1161,7 +1402,11 @@ function exitDrawMode() {
     segmentPreviewLayer: null,
     connectionPreviewBorderLayer: null,
     connectionPreviewLayer: null,
+    closePulseMarker: null,
     closeIndicatorLayer: null,
+    touchPendingMarker: null,
+    lastTapAt: 0,
+    acceptingTap: false,
     startedAfterCompletedShape: false,
     circleCenter: null,
     circlePreviewLayer: null,
@@ -1250,6 +1495,7 @@ function onMapMouseMove(e, mapId) {
     }
     return;
   }
+  if (isTouchDrawDevice()) return;
   const existingSegments = mapId === 1 ? getLinePoints(line1) : getLinePoints(line2);
   const lastSegment =
     existingSegments?.length &&
@@ -1296,10 +1542,10 @@ function onMapMouseMove(e, mapId) {
     const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
     const inCloseRange = dx * dx + dy * dy <= CLOSE_POINT_PX * CLOSE_POINT_PX;
+    const wrapper = mapId === 1 ? "wrapper1" : "wrapper2";
     if (inCloseRange) {
-      const wrapper = mapId === 1 ? "wrapper1" : "wrapper2";
       document.getElementById(wrapper).classList.add("within-close-range");
-      if (!drawState.closeIndicatorLayer) {
+      if (!isTouchDrawDevice() && !drawState.closeIndicatorLayer) {
         drawState.closeIndicatorLayer = L.circleMarker(first, {
           radius: CLOSE_POINT_PX,
           color: "#0088ff",
@@ -1310,10 +1556,12 @@ function onMapMouseMove(e, mapId) {
         }).addTo(map);
       }
     } else {
-      removeCloseIndicator(map);
+      removeDesktopCloseIndicator(map);
+      removeCloseHoverState();
     }
   } else {
-    removeCloseIndicator(map);
+    removeDesktopCloseIndicator(map);
+    removeCloseHoverState();
   }
   if (drawState.points.length < 1) {
     removeSegmentPreview(map);
@@ -1343,46 +1591,20 @@ function onMapMouseOut(e, mapId) {
   const map = mapId === 1 ? map1 : map2;
   removeSegmentPreview(map);
   removeConnectionPreview(map);
-  removeCloseIndicator(map);
+  removeDesktopCloseIndicator(map);
+  removeCloseHoverState();
   removeCirclePreview(map);
 }
 
-const MIN_CIRCLE_RADIUS_M = 20;
-
 function onMapClick(e, mapId) {
   if (drawState.mapId !== mapId) return;
-  e.originalEvent.preventDefault();
-  const map = mapId === 1 ? map1 : map2;
-  if (drawState.tool === "circle") {
-    if (!drawState.circleCenter) {
-      drawState.circleCenter = e.latlng;
-      return;
-    }
-    const radius = Math.max(
-      MIN_CIRCLE_RADIUS_M,
-      drawState.circleCenter.distanceTo(e.latlng)
-    );
-    finishCircleDraw(mapId, drawState.circleCenter, radius);
-    return;
-  }
-  if (drawState.points.length >= 2) {
-    const first = drawState.points[0];
-    const p0 = map.latLngToContainerPoint(first);
-    const p1 = map.latLngToContainerPoint(e.latlng);
-    const dx = p1.x - p0.x;
-    const dy = p1.y - p0.y;
-    if (dx * dx + dy * dy <= CLOSE_POINT_PX * CLOSE_POINT_PX) {
-      drawState.points.push(L.latLng(first.lat, first.lng));
-      finishDraw(mapId);
-      return;
-    }
-  }
-  drawState.points.push(e.latlng);
-  updatePreview(map, drawState.points);
+  if (e.originalEvent?.preventDefault) e.originalEvent.preventDefault();
+  processDrawTap(e, mapId);
 }
 
 function onMapDblClick(e, mapId) {
   if (drawState.mapId !== mapId) return;
+  if (isTouchDrawDevice()) return;
   L.DomEvent.stopPropagation(e);
   L.DomEvent.preventDefault(e);
   finishDraw(mapId);

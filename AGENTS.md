@@ -1,5 +1,11 @@
 # Agent notes
 
+## Formatting
+
+**Run `make format` after editing code** (or `npx prettier --write .`).
+
+The repo uses Prettier; CI fails if formatted files are not committed. Format before finishing a task that touched source, tests, or config.
+
 ## Visual / UI changes
 
 **Check snapshots after changing anything that affects how the page looks.**  

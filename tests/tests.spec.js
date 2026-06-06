@@ -416,6 +416,32 @@ test.describe("Line tool", () => {
     await expect(page).toHaveURL(/\#.+/);
     await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
   });
+
+  test("shows close indicator when hovering near start on desktop", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.hover({ position: { x: 105, y: 150 } });
+    await expect(page.locator("#wrapper1")).toHaveClass(/within-close-range/);
+    await expect(map1.locator(".leaflet-draw-close-indicator")).toBeVisible();
+  });
+
+  test("does not show touch pulse indicators on desktop", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#drawBox1").click();
+    await map1.click({ position: { x: 100, y: 150 } });
+    await map1.click({ position: { x: 200, y: 180 } });
+    await map1.click({ position: { x: 160, y: 280 } });
+    await expect(map1.locator(".leaflet-draw-pulse")).not.toBeVisible();
+    await expect(map1.locator(".leaflet-draw-pulse-close")).not.toBeVisible();
+  });
 });
 
 // Viewport sizes: small (mobile), medium (tablet), large (desktop)
