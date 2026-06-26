@@ -5,6 +5,99 @@ function syncZoom(level) {
 
 let applyingHistory = false;
 
+const LAST_VIEW_KEY = "cityzoom_last_view";
+let randomExamples = [];
+
+function roundCoord(n) {
+  return Math.round(Number(n) * 1e5) / 1e5;
+}
+
+function readStoredView() {
+  try {
+    const raw = localStorage.getItem(LAST_VIEW_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (
+      typeof data.zoom === "number" &&
+      typeof data.lat1 === "number" &&
+      typeof data.lon1 === "number" &&
+      typeof data.lat2 === "number" &&
+      typeof data.lon2 === "number"
+    ) {
+      return data;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function saveStoredView() {
+  function write() {
+    try {
+      const center1 = map1.getCenter();
+      const center2 = map2.getCenter();
+      const view = {
+        zoom: map1.getZoom(),
+        lat1: roundCoord(center1.lat),
+        lon1: roundCoord(center1.lng),
+        lat2: roundCoord(center2.lat),
+        lon2: roundCoord(center2.lng),
+      };
+      if (matchesRandomExample(view)) return;
+      localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(view));
+    } catch (_) {}
+  }
+  if (randomExamples.length) {
+    write();
+  } else {
+    locationExamplesPromise.then(write);
+  }
+}
+
+function normalizedViewFromUrl(url) {
+  const p = new URL(url, window.location.origin).searchParams;
+  if (!hasPositionParams(p)) return null;
+  return {
+    zoom: parseInt(p.get("zoom"), 10),
+    lat1: roundCoord(p.get("lat1")),
+    lon1: roundCoord(p.get("lon1")),
+    lat2: roundCoord(p.get("lat2")),
+    lon2: roundCoord(p.get("lon2")),
+  };
+}
+
+function viewsMatch(a, b) {
+  return (
+    a.zoom === b.zoom &&
+    a.lat1 === b.lat1 &&
+    a.lon1 === b.lon1 &&
+    a.lat2 === b.lat2 &&
+    a.lon2 === b.lon2
+  );
+}
+
+function matchesRandomExample(view) {
+  return randomExamples.some(function (ex) {
+    const exampleView = normalizedViewFromUrl(ex.url);
+    return exampleView && viewsMatch(view, exampleView);
+  });
+}
+
+function hasPositionParams(params) {
+  return (
+    params.has("zoom") &&
+    params.has("lat1") &&
+    params.has("lon1") &&
+    params.has("lat2") &&
+    params.has("lon2")
+  );
+}
+
+function hasLatLonParams(params) {
+  return (
+    params.has("lat1") || params.has("lon1") || params.has("lat2") || params.has("lon2")
+  );
+}
+
 function buildUrlParams() {
   const center1 = map1.getCenter();
   const center2 = map2.getCenter();
@@ -24,6 +117,7 @@ function buildUrlParams() {
 function pushMapUrl() {
   const hash = window.location.hash || "";
   history.pushState(null, "", "?" + buildUrlParams().toString() + hash);
+  saveStoredView();
   dismissCopiedState();
 }
 
@@ -68,18 +162,27 @@ function dismissCopiedState() {
 // Get initial center coordinates and zoom levels
 
 const urlParams = new URLSearchParams(window.location.search);
+const storedView = readStoredView();
 
 const initialCenter1 =
   urlParams.has("lat1") && urlParams.has("lon1")
     ? [parseFloat(urlParams.get("lat1")), parseFloat(urlParams.get("lon1"))]
-    : [42.9634, -85.6681]; // Grand Rapids, MI
+    : storedView
+      ? [storedView.lat1, storedView.lon1]
+      : [42.9634, -85.6681]; // Grand Rapids, MI
 
 const initialCenter2 =
   urlParams.has("lat2") && urlParams.has("lon2")
     ? [parseFloat(urlParams.get("lat2")), parseFloat(urlParams.get("lon2"))]
-    : [42.3314, -83.0458]; // Detroit, MI
+    : storedView
+      ? [storedView.lat2, storedView.lon2]
+      : [42.3314, -83.0458]; // Detroit, MI
 
-const initialZoom = urlParams.has("zoom") ? parseInt(urlParams.get("zoom")) : 13;
+const initialZoom = urlParams.has("zoom")
+  ? parseInt(urlParams.get("zoom"))
+  : storedView
+    ? storedView.zoom
+    : 13;
 
 const DEFAULT_BASEMAP = "osm";
 
@@ -230,6 +333,9 @@ const originalButtonText = "Copy URL";
 
 // Randomize location from examples (data.json). Use lat1 to avoid picking the current example.
 const locationExamplesPromise = fetch("src/data.json").then((r) => r.json());
+locationExamplesPromise.then(function (examples) {
+  randomExamples = examples;
+});
 
 function cityzoomLinkToLocalPath(linkUrl) {
   const u = new URL(linkUrl);
@@ -239,7 +345,7 @@ function cityzoomLinkToLocalPath(linkUrl) {
 function lat1FromCityzoomLink(linkUrl) {
   const lat1 = new URL(linkUrl).searchParams.get("lat1");
   if (lat1 == null) return null;
-  return Math.round(parseFloat(lat1) * 1e5) / 1e5;
+  return roundCoord(lat1);
 }
 
 function applyBasemapParamsToPath(localPath) {
@@ -253,8 +359,7 @@ function randomizeLocation() {
   locationExamplesPromise.then(function (examples) {
     if (!examples.length) return;
     const p = new URLSearchParams(window.location.search);
-    const round5 = (n) => Math.round(Number(n) * 1e5) / 1e5;
-    const currentLat1 = p.has("lat1") ? round5(p.get("lat1")) : null;
+    const currentLat1 = p.has("lat1") ? roundCoord(p.get("lat1")) : null;
     const others =
       currentLat1 != null
         ? examples.filter(function (e) {
@@ -1672,6 +1777,16 @@ document.getElementById("clearBox2").addEventListener("click", function () {
 
 applyFragmentToMaps();
 updateClearButtons();
+map1.whenReady(function () {
+  map2.whenReady(function () {
+    const p = new URLSearchParams(window.location.search);
+    if (hasPositionParams(p)) {
+      saveStoredView();
+    } else if (!hasLatLonParams(p)) {
+      pushMapUrl();
+    }
+  });
+});
 try {
   const toastName = sessionStorage.getItem("cityzoom_randomize_toast");
   if (toastName) {

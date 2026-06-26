@@ -186,6 +186,15 @@ test.describe("Home page", () => {
     await expect(page.locator("#basemapSelect2")).toHaveValue("esri");
   });
 
+  test("returns to last view when visiting without query params", async ({ page }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=41&lon2=-84");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.goto("/");
+    await expect(page).toHaveURL(/lat1=42\.5/, { timeout: 5000 });
+    await expect(page).toHaveURL(/lat2=41/);
+    await expect(page).toHaveURL(/zoom=12/);
+  });
+
   test("back button restores previous map view", async ({ page }) => {
     await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83");
     await page.waitForSelector("#map1", { state: "attached" });
@@ -195,6 +204,19 @@ test.describe("Home page", () => {
     await expect(page).toHaveURL(/lat1=43/);
     await page.goBack();
     await expect(page).toHaveURL(/lat1=42\.5/);
+    await expect(page).toHaveURL(/zoom=12/);
+  });
+
+  test("randomize does not overwrite stored last view", async ({ page }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=41&lon2=-84");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await Promise.all([
+      page.waitForURL(/\?zoom=.+&lat1=/, { timeout: 10000 }),
+      page.locator("#randomizeButton").click(),
+    ]);
+    await page.goto("/");
+    await expect(page).toHaveURL(/lat1=42\.5/, { timeout: 5000 });
+    await expect(page).toHaveURL(/lat2=41/);
     await expect(page).toHaveURL(/zoom=12/);
   });
 
