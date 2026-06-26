@@ -46,6 +46,32 @@
     />
     <script src="https://unpkg.com/leaflet-geosearch@3.6.1/dist/geosearch.umd.js"></script>
     <link rel="stylesheet" href="src/styles.css" />
+    <!-- Clarity -->
+    <script type="text/javascript">
+      (function () {
+        var host = window.location.hostname;
+        var isLocal =
+          host === "localhost" ||
+          host === "127.0.0.1" ||
+          host === "[::1]" ||
+          host.endsWith(".localhost");
+        if (isLocal || navigator.webdriver) {
+          return;
+        }
+        (function (c, l, a, r, i, t, y) {
+          c[a] =
+            c[a] ||
+            function () {
+              (c[a].q = c[a].q || []).push(arguments);
+            };
+          t = l.createElement(r);
+          t.async = 1;
+          t.src = "https://www.clarity.ms/tag/" + i;
+          y = l.getElementsByTagName(r)[0];
+          y.parentNode.insertBefore(t, y);
+        })(window, document, "clarity", "script", "xdactz6s8n");
+      })();
+    </script>
   </head>
   <body>
     <div id="header">
