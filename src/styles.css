@@ -243,6 +243,45 @@ body {
   display: none;
 }
 
+/* 16px avoids iOS Safari focus zoom; height matches touch control sizing */
+.leaflet-control-geosearch form input,
+.leaflet-geosearch-bar form input {
+  font-size: 16px;
+  height: 30px;
+}
+
+.leaflet-control-geosearch a.reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  width: 30px;
+  padding: 0;
+  /* Hide × text; draw strokes to match zoom +/- thickness */
+  color: transparent;
+  font-size: 0;
+}
+
+.leaflet-control-geosearch a.reset::before,
+.leaflet-control-geosearch a.reset::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  /* Diagonals read heavier than axis-aligned zoom +/-; 2px ≈ optical match to ~2.3px + */
+  height: 2px;
+  background: #000;
+}
+
+.leaflet-control-geosearch a.reset::before {
+  transform: rotate(45deg);
+}
+
+.leaflet-control-geosearch a.reset::after {
+  transform: rotate(-45deg);
+}
+
 /* Location button to the right of search input – override library hiding bar in top/bottom */
 .leaflet-top .leaflet-geosearch-bar,
 .leaflet-bottom .leaflet-geosearch-bar {
@@ -269,15 +308,15 @@ body {
   padding-right: 0;
 }
 
-/* Location button – same as zoom bar links */
+/* Location button – same height as search input */
 .leaflet-control-geosearch .leaflet-control-location-btn,
 .leaflet-geosearch-bar .leaflet-control-location-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
   padding: 0;
   background-color: #fff;
   border: none;
@@ -300,13 +339,6 @@ body {
   cursor: wait;
   background-color: #f4f4f4;
   color: #bbb;
-}
-
-.leaflet-touch .leaflet-control-geosearch .leaflet-control-location-btn,
-.leaflet-touch .leaflet-geosearch-bar .leaflet-control-location-btn {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
 }
 
 /* Draw controls – tool bar (line/circle) and clear bar are separate */
