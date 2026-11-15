@@ -1,6 +1,23 @@
 function syncZoom(level) {
-  map1.setZoom(level);
-  map2.setZoom(level);
+  if (map1.getZoom() !== level) map1.setZoom(level);
+  if (map2.getZoom() !== level) map2.setZoom(level);
+}
+
+function syncZoomFrom(sourceMap) {
+  const level = sourceMap.getZoom();
+  const other = sourceMap === map1 ? map2 : map1;
+  if (other.getZoom() !== level) other.setZoom(level);
+}
+
+function reconcileMapZooms(preferredMap) {
+  const source = preferredMap || map1;
+  const level = source.getZoom();
+  if (map1.getZoom() === level && map2.getZoom() === level) return;
+  isZooming = true;
+  syncZoom(level);
+  setTimeout(function () {
+    isZooming = false;
+  }, 100);
 }
 
 let applyingHistory = false;
@@ -272,6 +289,8 @@ const initialBasemaps = parseBasemapParams(urlParams);
 let currentBasemap = [initialBasemaps.map1, initialBasemaps.map2];
 
 // Initialize the maps (independent bearing per map; pitch disabled — rotation only)
+// Touch: leaflet-rotate merges pinch-zoom + twist into one gesture; we lock each
+// two-finger gesture to zoom OR rotate so the maps cannot desync (see below).
 
 function mapRotateOptions(bearing) {
   return {
@@ -480,7 +499,11 @@ function addLocationButtonToSearch(map) {
     btn.disabled = true;
     navigator.geolocation.getCurrentPosition(
       function (pos) {
-        map.setView([pos.coords.latitude, pos.coords.longitude], map.getZoom());
+        // Keep a close zoom if already there; otherwise pull in to a neighborhood view.
+        const LOCATION_MIN_ZOOM = 14;
+        const zoom = Math.max(map.getZoom(), LOCATION_MIN_ZOOM);
+        map.setView([pos.coords.latitude, pos.coords.longitude], zoom);
+        map.setBearing(0);
         syncMaps();
         btn.disabled = false;
       },
@@ -609,7 +632,7 @@ let rotateUrlTimer = null;
 map1.on("zoomend", function () {
   if (!isZooming) {
     isZooming = true;
-    syncZoom(map1.getZoom());
+    syncZoomFrom(map1);
     syncMaps();
     setTimeout(() => {
       isZooming = false;
@@ -620,7 +643,7 @@ map1.on("zoomend", function () {
 map2.on("zoomend", function () {
   if (!isZooming) {
     isZooming = true;
-    syncZoom(map2.getZoom());
+    syncZoomFrom(map2);
     syncMaps();
     setTimeout(() => {
       isZooming = false;
@@ -630,10 +653,14 @@ map2.on("zoomend", function () {
 
 function onMapRotate() {
   if (applyingHistory) return;
-  // Rotation does not always fire moveend; debounce URL updates during drag/twist.
+  const sourceMap = this;
+  // Two-finger gestures finish in installExclusivePinchRotate (avoids mid-pinch
+  // zoom reconcile). Compass / Shift+wheel still debounce into the URL here.
+  if (sourceMap.touchGestures && sourceMap.touchGestures._gesture) return;
   if (rotateUrlTimer) clearTimeout(rotateUrlTimer);
   rotateUrlTimer = setTimeout(function () {
     rotateUrlTimer = null;
+    reconcileMapZooms(sourceMap);
     syncMaps();
   }, 150);
 }
@@ -643,6 +670,230 @@ map2.on("rotate", onMapRotate);
 
 map1.on("moveend", syncMaps);
 map2.on("moveend", syncMaps);
+
+// leaflet-rotate's TouchGestures applies pinch-zoom and twist-rotate together.
+// Pinch can lock immediately. Rotate arms after holding two fingers with little
+// scale change (works even when fingers stay still — no touchmove required).
+const PINCH_ZOOM_SCALE_LOCK = 0.05;
+const PINCH_ROTATE_HOLD_MS = 350;
+const PINCH_ROTATE_MAX_SCALE_DELTA = 0.03;
+
+function clearTouchGestureIndicator(map) {
+  const root = map.getContainer();
+  root.classList.remove("touch-gesture-zoom", "touch-gesture-rotate");
+  root.querySelectorAll(".touch-gesture-active").forEach(function (el) {
+    el.classList.remove("touch-gesture-active");
+  });
+}
+
+function showTouchGestureIndicator(map, mode) {
+  clearTouchGestureIndicator(map);
+  const root = map.getContainer();
+  root.classList.add(mode === "rotate" ? "touch-gesture-rotate" : "touch-gesture-zoom");
+  if (mode === "rotate") {
+    const toggle = root.querySelector(".leaflet-control-rotate-toggle");
+    const bar = root.querySelector(".leaflet-control-rotate");
+    if (toggle) toggle.classList.add("touch-gesture-active");
+    if (bar) bar.classList.add("touch-gesture-active");
+  } else {
+    const bar = root.querySelector(".leaflet-control-zoom");
+    if (bar) bar.classList.add("touch-gesture-active");
+  }
+}
+
+function clearRotateHoldTimer(gestures) {
+  if (gestures._rotateHoldTimer) {
+    clearTimeout(gestures._rotateHoldTimer);
+    gestures._rotateHoldTimer = null;
+  }
+  if (gestures._rotateHoldRaf) {
+    cancelAnimationFrame(gestures._rotateHoldRaf);
+    gestures._rotateHoldRaf = null;
+  }
+}
+
+function armRotateHoldWatch(gestures, map) {
+  clearRotateHoldTimer(gestures);
+  const startedAt = gestures._gestureStartedAt || Date.now();
+  function tick() {
+    gestures._rotateHoldRaf = null;
+    if (gestures._exclusiveMode || !gestures._gesture || !gestures._rotateEligible)
+      return;
+    if (Date.now() - startedAt >= PINCH_ROTATE_HOLD_MS) {
+      lockExclusiveRotate(gestures, map);
+      return;
+    }
+    gestures._rotateHoldRaf = requestAnimationFrame(tick);
+  }
+  gestures._rotateHoldTimer = setTimeout(function () {
+    gestures._rotateHoldTimer = null;
+    if (gestures._exclusiveMode || !gestures._gesture || !gestures._rotateEligible)
+      return;
+    lockExclusiveRotate(gestures, map);
+  }, PINCH_ROTATE_HOLD_MS);
+  gestures._rotateHoldRaf = requestAnimationFrame(tick);
+}
+
+function beginExclusiveGesture(gestures, map) {
+  gestures._gestureStartedAt = Date.now();
+  // True map bearing (plugin _startBearing may be offset +180 for atan math).
+  gestures._bearingAtStart = map.getBearing();
+  gestures._rotateEligible = !!(gestures.rotate || gestures._rotating);
+  // Suppress twist until hold-to-rotate arms so pinch wins by default.
+  if (gestures._rotateEligible) gestures._rotating = false;
+  clearTouchGestureIndicator(map);
+  gestures._lastP1 = null;
+  gestures._lastP2 = null;
+  if (gestures._rotateEligible) armRotateHoldWatch(gestures, map);
+}
+
+function lockExclusiveZoom(gestures, map) {
+  clearRotateHoldTimer(gestures);
+  gestures._exclusiveMode = "zoom";
+  gestures._rotating = false;
+  gestures._rotateEligible = false;
+  // Restore true bearing — never use plugin _startBearing (can be +180).
+  if (
+    typeof gestures._bearingAtStart === "number" &&
+    map.getBearing() !== gestures._bearingAtStart
+  ) {
+    map.setBearing(gestures._bearingAtStart);
+  }
+  showTouchGestureIndicator(map, "zoom");
+}
+
+function baselineRotateGesture(gestures, map, p1, p2) {
+  // Match leaflet-rotate's atan start convention so the next move does not jump.
+  const delta = p1.subtract(p2);
+  if (!delta.x && !delta.y) return;
+  gestures._startTheta = Math.atan(delta.x / delta.y);
+  gestures._startBearing = map.getBearing();
+  if (delta.y < 0) gestures._startBearing += 180;
+}
+
+function lockExclusiveRotate(gestures, map, p1, p2) {
+  clearRotateHoldTimer(gestures);
+  gestures._exclusiveMode = "rotate";
+  gestures._zooming = false;
+  gestures._zoom = gestures._startZoom;
+  const a = p1 || gestures._lastP1;
+  const b = p2 || gestures._lastP2;
+  if (a && b) {
+    baselineRotateGesture(gestures, map, a, b);
+  }
+  // If fingers never moved, keep plugin _startTheta/_startBearing from touchstart.
+  // Overwriting only _startBearing with getBearing() causes a 180° snap on first twist.
+  gestures._rotating = true;
+  if (
+    typeof gestures._startZoom === "number" &&
+    map.getZoom() !== gestures._startZoom
+  ) {
+    isZooming = true;
+    map.setZoom(gestures._startZoom, { animate: false });
+    setTimeout(function () {
+      isZooming = false;
+    }, 100);
+  }
+  showTouchGestureIndicator(map, "rotate");
+}
+
+function installExclusivePinchRotate(map) {
+  const gestures = map.touchGestures;
+  if (!gestures || gestures._exclusivePinchRotate) return;
+  gestures._exclusivePinchRotate = true;
+
+  const container = map.getContainer();
+  const originalStart = gestures._onTouchStart;
+  const originalMove = gestures._onTouchMove;
+  const originalEnd = gestures._onTouchEnd;
+
+  gestures._onTouchStart = function (t) {
+    originalStart.apply(this, arguments);
+    clearRotateHoldTimer(this);
+    if (this._gesture) beginExclusiveGesture(this, map);
+  };
+
+  gestures._onTouchMove = function (t) {
+    // If touchstart was still bound to the pre-wrap handler (iOS), catch up here.
+    if (
+      t.touches &&
+      t.touches.length === 2 &&
+      this._gesture &&
+      this._rotateEligible === undefined &&
+      !this._exclusiveMode
+    ) {
+      beginExclusiveGesture(this, map);
+    }
+    if (
+      t.touches &&
+      t.touches.length === 2 &&
+      this._gesture === "pinch" &&
+      !this._exclusiveMode &&
+      this._startDist
+    ) {
+      const p1 = map.mouseEventToContainerPoint(t.touches[0]);
+      const p2 = map.mouseEventToContainerPoint(t.touches[1]);
+      this._lastP1 = p1;
+      this._lastP2 = p2;
+      const scaleDelta = Math.abs(p1.distanceTo(p2) / this._startDist - 1);
+
+      if (this._zooming && scaleDelta >= PINCH_ZOOM_SCALE_LOCK) {
+        lockExclusiveZoom(this, map);
+      } else if (
+        this._rotateEligible &&
+        scaleDelta < PINCH_ROTATE_MAX_SCALE_DELTA &&
+        Date.now() - (this._gestureStartedAt || 0) >= PINCH_ROTATE_HOLD_MS
+      ) {
+        lockExclusiveRotate(this, map, p1, p2);
+      } else if (scaleDelta >= PINCH_ROTATE_MAX_SCALE_DELTA) {
+        clearRotateHoldTimer(this);
+        this._rotateEligible = false;
+      }
+    }
+    return originalMove.call(this, t);
+  };
+
+  gestures._onTouchEnd = function () {
+    const mode = this._exclusiveMode;
+    const startZoom = this._startZoom;
+    clearRotateHoldTimer(this);
+    this._exclusiveMode = null;
+    this._rotateEligible = undefined;
+    clearTouchGestureIndicator(map);
+    if (mode === "rotate") {
+      // leaflet-rotate's touch end commits zoom whenever handler.zoom is on and
+      // _moved is set — even if we cleared _zooming. Skip that commit for twists.
+      this._moved = false;
+      this._zooming = false;
+      if (typeof startZoom === "number") this._zoom = startZoom;
+    }
+    const result = originalEnd.apply(this, arguments);
+    if (mode === "rotate") {
+      if (typeof startZoom === "number") {
+        isZooming = true;
+        syncZoom(startZoom);
+        setTimeout(function () {
+          isZooming = false;
+        }, 100);
+      } else {
+        reconcileMapZooms(map);
+      }
+      syncMaps();
+    } else if (mode === "zoom") {
+      reconcileMapZooms(map);
+      syncMaps();
+    }
+    return result;
+  };
+
+  // DomEvent keeps the function reference from addHooks — rebind so iOS touchstart
+  // actually hits our wrapper (property replacement alone is not enough).
+  L.DomEvent.off(container, "touchstart", originalStart, gestures);
+  L.DomEvent.on(container, "touchstart", gestures._onTouchStart, gestures);
+}
+
+installExclusivePinchRotate(map1);
+installExclusivePinchRotate(map2);
 
 function locationToLatLng(loc) {
   if (!loc) return null;

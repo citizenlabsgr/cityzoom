@@ -149,19 +149,44 @@ test.describe("Home page", () => {
     await expect(page.locator("#randomizeButton")).toBeVisible();
   });
 
-  test("location button sets map to current position without changing zoom", async ({
+  test("location button centers map, resets bearing, and enforces a minimum zoom", async ({
     page,
     context,
   }) => {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation({ latitude: 42.35, longitude: -83.05 });
-    await page.goto("/?zoom=11&lat1=42.33&lon1=-83.04&lat2=42.33&lon2=-83.04");
+    await page.goto(
+      "/?zoom=11&lat1=42.33&lon1=-83.04&lat2=42.33&lon2=-83.04&rot1=45&rot2=90"
+    );
     await page.waitForSelector("#map1", { state: "attached" });
     const locationBtn = page.locator(".leaflet-control-location-btn").first();
     await expect(locationBtn).toBeVisible({ timeout: 5000 });
     await locationBtn.click();
     await expect(page).toHaveURL(/lat1=42\.3/, { timeout: 5000 });
-    await expect(page).toHaveURL(/zoom=11/);
+    await expect(page).toHaveURL(/zoom=14/);
+    await expect(page).not.toHaveURL(/rot1=/);
+    await expect(page).toHaveURL(/rot2=90/);
+    const state = await page.evaluate(() => ({
+      map1Bearing: Math.round(window.map1.getBearing()),
+      map2Bearing: Math.round(window.map2.getBearing()),
+      zoom: window.map1.getZoom(),
+    }));
+    expect(state.map1Bearing).toBe(0);
+    expect(state.map2Bearing).toBe(90);
+    expect(state.zoom).toBe(14);
+  });
+
+  test("location button keeps a closer zoom when already zoomed in", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: 42.35, longitude: -83.05 });
+    await page.goto("/?zoom=17&lat1=42.33&lon1=-83.04&lat2=42.33&lon2=-83.04");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.locator(".leaflet-control-location-btn").first().click();
+    await expect(page).toHaveURL(/lat1=42\.3/, { timeout: 5000 });
+    await expect(page).toHaveURL(/zoom=17/);
   });
 
   test("basemap dropdown updates URL and layer", async ({ page }) => {
@@ -264,6 +289,86 @@ test.describe("Home page", () => {
     await expect(page).toHaveURL(/lat1=42\.5/, { timeout: 5000 });
     await expect(page).not.toHaveURL(/rot1=/);
     await expect(page).not.toHaveURL(/rot2=/);
+  });
+
+  test("keeps zoom levels synced when one map zooms and updates the URL", async ({
+    page,
+  }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83&rot1=20&rot2=40");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.evaluate(() => {
+      window.map2.setZoom(14);
+    });
+    await expect(page).toHaveURL(/zoom=14/, { timeout: 5000 });
+    const state = await page.evaluate(() => ({
+      z1: window.map1.getZoom(),
+      z2: window.map2.getZoom(),
+      rot1: Math.round(window.map1.getBearing()),
+      rot2: Math.round(window.map2.getBearing()),
+      exclusive: !!(
+        window.map1.touchGestures &&
+        window.map1.touchGestures._exclusivePinchRotate &&
+        window.map2.touchGestures &&
+        window.map2.touchGestures._exclusivePinchRotate
+      ),
+    }));
+    expect(state.z1).toBe(14);
+    expect(state.z2).toBe(14);
+    expect(state.rot1).toBe(20);
+    expect(state.rot2).toBe(40);
+    expect(state.exclusive).toBe(true);
+    await expect(page).toHaveURL(/rot1=20/);
+    await expect(page).toHaveURL(/rot2=40/);
+  });
+
+  test("touch gesture indicator highlights zoom or rotate controls", async ({
+    page,
+  }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const result = await page.evaluate(() => {
+      const map = window.map1;
+      const root = map.getContainer();
+      const zoom = root.querySelector(".leaflet-control-zoom");
+      const rotate = root.querySelector(".leaflet-control-rotate");
+      const toggle = root.querySelector(".leaflet-control-rotate-toggle");
+      root.classList.add("touch-gesture-rotate");
+      rotate.classList.add("touch-gesture-active");
+      toggle.classList.add("touch-gesture-active");
+      const rotateBorder = getComputedStyle(rotate).borderColor;
+      const toggleBg = getComputedStyle(toggle).backgroundColor;
+      const toggleShadow = getComputedStyle(toggle).boxShadow;
+      root.classList.remove("touch-gesture-rotate");
+      rotate.classList.remove("touch-gesture-active");
+      toggle.classList.remove("touch-gesture-active");
+      root.classList.add("touch-gesture-zoom");
+      zoom.classList.add("touch-gesture-active");
+      const zoomBorder = getComputedStyle(zoom).borderColor;
+      root.classList.remove("touch-gesture-zoom");
+      zoom.classList.remove("touch-gesture-active");
+      return {
+        hasZoom: !!zoom,
+        hasRotate: !!rotate,
+        hasToggle: !!toggle,
+        rotateBorder,
+        zoomBorder,
+        toggleBg,
+        toggleShadow,
+        exclusiveInstalled: !!(
+          map.touchGestures && map.touchGestures._exclusivePinchRotate
+        ),
+        remaining: root.querySelectorAll(".touch-gesture-active").length,
+      };
+    });
+    expect(result.hasZoom).toBe(true);
+    expect(result.hasRotate).toBe(true);
+    expect(result.hasToggle).toBe(true);
+    expect(result.rotateBorder).toContain("0, 136, 255");
+    expect(result.zoomBorder).toContain("0, 136, 255");
+    expect(result.toggleBg).toContain("232, 244, 255");
+    expect(result.toggleShadow).not.toBe("none");
+    expect(result.exclusiveInstalled).toBe(true);
+    expect(result.remaining).toBe(0);
   });
 
   test("randomize does not overwrite stored last view", async ({ page }) => {

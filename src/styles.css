@@ -117,6 +117,25 @@ body {
   cursor: grabbing;
 }
 
+/* Touch pinch/twist lock: outline zoom ± or compass while that mode is active */
+.leaflet-container.touch-gesture-zoom .leaflet-control-zoom,
+.leaflet-control-zoom.touch-gesture-active {
+  border-color: #0088ff;
+  box-shadow: 0 0 0 2px #0088ff;
+}
+
+.leaflet-container.touch-gesture-rotate .leaflet-control-rotate,
+.leaflet-control-rotate.touch-gesture-active {
+  border-color: #0088ff;
+  box-shadow: 0 0 0 2px #0088ff;
+}
+
+/* The visible compass control is the <a> toggle — outline that on mobile */
+.leaflet-control-rotate-toggle.touch-gesture-active {
+  box-shadow: inset 0 0 0 2px #0088ff;
+  background-color: #e8f4ff !important;
+}
+
 /* Basemap selector on each map — match Leaflet scale control styling */
 .leaflet-basemap-control.leaflet-bar {
   background: rgba(255, 255, 255, 0.65);
