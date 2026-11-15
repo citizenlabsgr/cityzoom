@@ -12,6 +12,19 @@ function roundCoord(n) {
   return Math.round(Number(n) * 1e5) / 1e5;
 }
 
+function normalizeBearing(degrees) {
+  let n = Number(degrees);
+  if (!Number.isFinite(n)) return 0;
+  n = ((n % 360) + 360) % 360;
+  n = Math.round(n * 10) / 10;
+  return n === 360 ? 0 : n;
+}
+
+function bearingFromParams(params, name) {
+  if (!params.has(name)) return 0;
+  return normalizeBearing(parseFloat(params.get(name)));
+}
+
 function readStoredView() {
   try {
     const raw = localStorage.getItem(LAST_VIEW_KEY);
@@ -24,6 +37,8 @@ function readStoredView() {
       typeof data.lat2 === "number" &&
       typeof data.lon2 === "number"
     ) {
+      data.rot1 = normalizeBearing(typeof data.rot1 === "number" ? data.rot1 : 0);
+      data.rot2 = normalizeBearing(typeof data.rot2 === "number" ? data.rot2 : 0);
       return data;
     }
   } catch (_) {}
@@ -41,6 +56,8 @@ function saveStoredView() {
         lon1: roundCoord(center1.lng),
         lat2: roundCoord(center2.lat),
         lon2: roundCoord(center2.lng),
+        rot1: normalizeBearing(map1.getBearing()),
+        rot2: normalizeBearing(map2.getBearing()),
       };
       if (matchesRandomExample(view)) return;
       localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(view));
@@ -62,6 +79,8 @@ function normalizedViewFromUrl(url) {
     lon1: roundCoord(p.get("lon1")),
     lat2: roundCoord(p.get("lat2")),
     lon2: roundCoord(p.get("lon2")),
+    rot1: bearingFromParams(p, "rot1"),
+    rot2: bearingFromParams(p, "rot2"),
   };
 }
 
@@ -71,7 +90,9 @@ function viewsMatch(a, b) {
     a.lat1 === b.lat1 &&
     a.lon1 === b.lon1 &&
     a.lat2 === b.lat2 &&
-    a.lon2 === b.lon2
+    a.lon2 === b.lon2 &&
+    normalizeBearing(a.rot1 || 0) === normalizeBearing(b.rot1 || 0) &&
+    normalizeBearing(a.rot2 || 0) === normalizeBearing(b.rot2 || 0)
   );
 }
 
@@ -109,6 +130,10 @@ function buildUrlParams() {
     lat2: center2.lat.toFixed(5),
     lon2: center2.lng.toFixed(5),
   });
+  const rot1 = normalizeBearing(map1.getBearing());
+  const rot2 = normalizeBearing(map2.getBearing());
+  if (rot1 !== 0) params.set("rot1", String(rot1));
+  if (rot2 !== 0) params.set("rot2", String(rot2));
   if (currentBasemap[0] === "esri") params.set("sat1", "true");
   if (currentBasemap[1] === "esri") params.set("sat2", "true");
   return params;
@@ -184,6 +209,18 @@ const initialZoom = urlParams.has("zoom")
     ? storedView.zoom
     : 13;
 
+const initialBearing1 = urlParams.has("rot1")
+  ? bearingFromParams(urlParams, "rot1")
+  : storedView
+    ? storedView.rot1
+    : 0;
+
+const initialBearing2 = urlParams.has("rot2")
+  ? bearingFromParams(urlParams, "rot2")
+  : storedView
+    ? storedView.rot2
+    : 0;
+
 const DEFAULT_BASEMAP = "osm";
 
 const BASEMAP_CONFIG = {
@@ -234,10 +271,34 @@ function parseBasemapParams(params) {
 const initialBasemaps = parseBasemapParams(urlParams);
 let currentBasemap = [initialBasemaps.map1, initialBasemaps.map2];
 
-// Initialize the maps
+// Initialize the maps (independent bearing per map; pitch disabled — rotation only)
 
-var map1 = L.map("map1").setView(initialCenter1, initialZoom);
-var map2 = L.map("map2").setView(initialCenter2, initialZoom);
+function mapRotateOptions(bearing) {
+  return {
+    rotate: true,
+    bearing: bearing,
+    pitch: 0,
+    touchRotate: true,
+    touchPitch: false,
+    pitchDrag: false,
+    shiftKeyRotate: true,
+    // Desktop: always-visible compass (drag to rotate, click to reset north)
+    // plus Shift + mouse wheel. Mobile: two-finger twist via touchRotate.
+    rotateControl: {
+      closeOnZeroBearing: false,
+      visualizePitch: false,
+    },
+  };
+}
+
+var map1 = L.map("map1", mapRotateOptions(initialBearing1)).setView(
+  initialCenter1,
+  initialZoom
+);
+var map2 = L.map("map2", mapRotateOptions(initialBearing2)).setView(
+  initialCenter2,
+  initialZoom
+);
 
 function invalidateMapSizes() {
   map1.invalidateSize();
@@ -543,6 +604,7 @@ map2.addControl(new DrawLineControl(2));
 // Add event handlers
 
 let isZooming = false;
+let rotateUrlTimer = null;
 
 map1.on("zoomend", function () {
   if (!isZooming) {
@@ -565,6 +627,19 @@ map2.on("zoomend", function () {
     }, 100);
   }
 });
+
+function onMapRotate() {
+  if (applyingHistory) return;
+  // Rotation does not always fire moveend; debounce URL updates during drag/twist.
+  if (rotateUrlTimer) clearTimeout(rotateUrlTimer);
+  rotateUrlTimer = setTimeout(function () {
+    rotateUrlTimer = null;
+    syncMaps();
+  }, 150);
+}
+
+map1.on("rotate", onMapRotate);
+map2.on("rotate", onMapRotate);
 
 map1.on("moveend", syncMaps);
 map2.on("moveend", syncMaps);
@@ -1813,6 +1888,8 @@ function applyUrlToMaps() {
     const lon2 = parseFloat(p.get("lon2"));
     map1.setView([lat1, lon1], zoom);
     map2.setView([lat2, lon2], zoom);
+    map1.setBearing(bearingFromParams(p, "rot1"));
+    map2.setBearing(bearingFromParams(p, "rot2"));
     applyingHistory = false;
   }
   const wantBasemaps = parseBasemapParams(p);

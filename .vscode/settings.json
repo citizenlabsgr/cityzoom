@@ -12,7 +12,11 @@
     "stylesheet",
     "VIEWPORTS",
     "xdactz",
-    "zoomend"
+    "zoomend",
+    "touchRotate",
+    "shiftKeyRotate",
+    "pitchDrag",
+    "rotateControl"
   ],
   "djlint.showInstallError": false
 }
