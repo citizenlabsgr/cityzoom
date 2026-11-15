@@ -187,12 +187,14 @@ test.describe("Home page", () => {
   });
 
   test("returns to last view when visiting without query params", async ({ page }) => {
-    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=41&lon2=-84");
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=41&lon2=-84&rot1=45&rot2=90");
     await page.waitForSelector("#map1", { state: "attached" });
     await page.goto("/");
     await expect(page).toHaveURL(/lat1=42\.5/, { timeout: 5000 });
     await expect(page).toHaveURL(/lat2=41/);
     await expect(page).toHaveURL(/zoom=12/);
+    await expect(page).toHaveURL(/rot1=45/);
+    await expect(page).toHaveURL(/rot2=90/);
   });
 
   test("back button restores previous map view", async ({ page }) => {
@@ -205,6 +207,63 @@ test.describe("Home page", () => {
     await page.goBack();
     await expect(page).toHaveURL(/lat1=42\.5/);
     await expect(page).toHaveURL(/zoom=12/);
+  });
+
+  test("rotates each map independently and stores bearings in the URL", async ({
+    page,
+  }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await expect(page.locator(".leaflet-control-rotate").first()).toBeVisible();
+    await page.evaluate(() => {
+      window.map1.setBearing(90);
+      window.map2.setBearing(180);
+    });
+    await expect(page).toHaveURL(/rot1=90/, { timeout: 5000 });
+    await expect(page).toHaveURL(/rot2=180/);
+    const bearings = await page.evaluate(() => ({
+      map1: Math.round(window.map1.getBearing()),
+      map2: Math.round(window.map2.getBearing()),
+    }));
+    expect(bearings.map1).toBe(90);
+    expect(bearings.map2).toBe(180);
+  });
+
+  test("loads and restores independent rotation from the URL", async ({ page }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83&rot1=30&rot2=60");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const initial = await page.evaluate(() => ({
+      map1: Math.round(window.map1.getBearing()),
+      map2: Math.round(window.map2.getBearing()),
+    }));
+    expect(initial.map1).toBe(30);
+    expect(initial.map2).toBe(60);
+    await page.evaluate(() => {
+      window.map1.setBearing(120);
+    });
+    await expect(page).toHaveURL(/rot1=120/, { timeout: 5000 });
+    await expect(page).toHaveURL(/rot2=60/);
+    await page.goBack();
+    await expect(page).toHaveURL(/rot1=30/);
+    await expect(page).toHaveURL(/rot2=60/);
+    const restored = await page.evaluate(() => ({
+      map1: Math.round(window.map1.getBearing()),
+      map2: Math.round(window.map2.getBearing()),
+    }));
+    expect(restored.map1).toBe(30);
+    expect(restored.map2).toBe(60);
+  });
+
+  test("omits rot params from the URL when bearings are north", async ({ page }) => {
+    await page.goto("/?zoom=12&lat1=42.5&lon1=-83&lat2=42.5&lon2=-83&rot1=15&rot2=20");
+    await page.waitForSelector("#map1", { state: "attached" });
+    await page.evaluate(() => {
+      window.map1.setBearing(0);
+      window.map2.setBearing(0);
+    });
+    await expect(page).toHaveURL(/lat1=42\.5/, { timeout: 5000 });
+    await expect(page).not.toHaveURL(/rot1=/);
+    await expect(page).not.toHaveURL(/rot2=/);
   });
 
   test("randomize does not overwrite stored last view", async ({ page }) => {

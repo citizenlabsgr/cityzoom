@@ -108,6 +108,15 @@ body {
   margin-right: -10px; /* pull right to align with map edge (header padding 20px − map border 10px) */
 }
 
+/* Compass / rotate control (leaflet-rotate) */
+.leaflet-control-rotate a.leaflet-control-rotate-toggle {
+  cursor: grab;
+}
+
+.leaflet-control-rotate a.leaflet-control-rotate-toggle:active {
+  cursor: grabbing;
+}
+
 /* Basemap selector on each map — match Leaflet scale control styling */
 .leaflet-basemap-control.leaflet-bar {
   background: rgba(255, 255, 255, 0.65);
