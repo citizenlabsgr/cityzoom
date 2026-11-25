@@ -369,7 +369,7 @@ body {
   color: #bbb;
 }
 
-/* Draw controls – tool bar (line/circle) and clear bar are separate */
+/* Draw controls – tool bar (line/circle/rectangle) and clear bar are separate */
 .leaflet-draw-controls .leaflet-bar {
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
   border-radius: 4px;
@@ -444,6 +444,7 @@ body {
 
 .leaflet-draw-controls .leaflet-draw-line-icon,
 .leaflet-draw-controls .leaflet-draw-circle-icon,
+.leaflet-draw-controls .leaflet-draw-rect-icon,
 .leaflet-draw-controls .leaflet-draw-trash-icon {
   width: 18px;
   height: 18px;
@@ -485,7 +486,8 @@ body {
 }
 
 .leaflet-draw-line .leaflet-draw-line-btn.active .leaflet-draw-line-icon,
-.leaflet-draw-line .leaflet-draw-line-btn.active .leaflet-draw-circle-icon {
+.leaflet-draw-line .leaflet-draw-line-btn.active .leaflet-draw-circle-icon,
+.leaflet-draw-line .leaflet-draw-line-btn.active .leaflet-draw-rect-icon {
   color: #fff;
 }
 

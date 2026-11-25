@@ -498,6 +498,60 @@ test.describe("Circle tool", () => {
   });
 });
 
+test.describe("Rectangle tool", () => {
+  test("two clicks place rectangle and update URL", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#rectBox1").click();
+    await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
+    await map1.click({ position: { x: 120, y: 160 } });
+    await map1.click({ position: { x: 260, y: 280 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("rectangle persists in URL and is restored on reload", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#rectBox1").click();
+    await map1.click({ position: { x: 120, y: 160 } });
+    await map1.click({ position: { x: 260, y: 280 } });
+    const url = page.url();
+    await expect(url).toMatch(/\#.+/);
+    await page.goto(url);
+    await page.waitForSelector("#map1", { state: "attached" });
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+  });
+
+  test("can draw two rectangles on same map and both persist", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+    await page.locator("#rectBox1").click();
+    await map1.click({ position: { x: 100, y: 140 } });
+    await map1.click({ position: { x: 180, y: 220 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await page.locator("#rectBox1").click();
+    await map1.click({ position: { x: 220, y: 160 } });
+    await map1.click({ position: { x: 300, y: 240 } });
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    const rects = page.locator("#map1 .leaflet-overlay-pane path.leaflet-interactive");
+    await expect(rects.first()).toBeVisible();
+    await expect(rects).toHaveCount(4);
+    const url = page.url();
+    await page.goto(url);
+    await page.waitForSelector("#map1", { state: "attached" });
+    const rectsAfter = page.locator(
+      "#map1 .leaflet-overlay-pane path.leaflet-interactive"
+    );
+    await expect(rectsAfter).toHaveCount(4);
+  });
+});
+
 test.describe("Line tool", () => {
   test("drawing persists after Escape", async ({ page }) => {
     await page.goto("/");
@@ -658,10 +712,14 @@ test.describe("Map annotations", { tag: "@snapshot" }, () => {
       await map1.click({ position: { x: 200, y: 220 } });
       await map1.click({ position: triangleFirst });
       await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
-      // Map2: circle
+      // Map2: circle (left) then rectangle (right) — avoid zoom/draw controls
       await page.locator("#circleBox2").click();
-      await map2.click({ position: { x: 150, y: 200 } });
-      await map2.click({ position: { x: 250, y: 200 } });
+      await map2.click({ position: { x: 120, y: 200 } });
+      await map2.click({ position: { x: 180, y: 200 } });
+      await expect(page.locator("#wrapper2")).not.toHaveClass(/draw-mode/);
+      await page.locator("#rectBox2").click();
+      await map2.click({ position: { x: 240, y: 80 } });
+      await map2.click({ position: { x: 320, y: 160 } });
       await expect(page.locator("#wrapper2")).not.toHaveClass(/draw-mode/);
       await page.waitForTimeout(500);
       await expect(page).toHaveScreenshot(`home-${name}.png`, {

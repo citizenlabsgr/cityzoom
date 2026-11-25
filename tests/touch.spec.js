@@ -160,3 +160,54 @@ test.describe("Touch circle drawing", () => {
     await expect(map1.locator(".leaflet-draw-pulse")).not.toBeVisible();
   });
 });
+
+test.describe("Touch rectangle drawing", () => {
+  test("shows pulse at corner after placing first corner", async ({ page }) => {
+    await stubTouchDrawDevice(page);
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+
+    await page.locator("#rectBox1").click();
+    await expect(page.locator("#toast.visible")).toContainText(
+      "Tap to place the first corner"
+    );
+
+    await map1.click({ position: { x: 120, y: 160 } });
+    await expect(page.locator("#toast.visible")).toContainText(
+      "Tap to place the opposite corner"
+    );
+    await expect(map1.locator(".leaflet-draw-pulse")).toBeVisible();
+  });
+
+  test("two taps place rectangle, dismiss toast, and exit draw mode", async ({
+    page,
+  }) => {
+    await stubTouchDrawDevice(page);
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+    await page.waitForSelector("#map1", { state: "attached" });
+    const map1 = page.locator("#map1");
+
+    await page.locator("#rectBox1").click();
+    await expect(page.locator("#wrapper1")).toHaveClass(/draw-mode/);
+    await expect(page.locator("#toast.visible")).toContainText(
+      "Tap to place the first corner"
+    );
+
+    await map1.click({ position: { x: 120, y: 160 } });
+    await expect(page.locator("#toast.visible")).toContainText(
+      "Tap to place the opposite corner"
+    );
+    await expect(map1.locator(".leaflet-draw-pulse")).toBeVisible();
+
+    await page.waitForTimeout(500);
+    await map1.click({ position: { x: 260, y: 280 } });
+    await expect(page.locator("#toast.visible")).not.toBeVisible();
+    await expect(page.locator("#wrapper1")).not.toHaveClass(/draw-mode/);
+    await expect(page).toHaveURL(/\#.+/);
+    await expect(page.locator("#map1 path.leaflet-interactive").first()).toBeVisible();
+    await expect(map1.locator(".leaflet-draw-pulse")).not.toBeVisible();
+  });
+});

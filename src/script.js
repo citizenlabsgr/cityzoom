@@ -574,11 +574,19 @@ function touchDrawCircleHint(hasCenter) {
   return hasCenter ? "Tap to set the circle radius" : "Tap to place the circle center";
 }
 
-// Line segment, circle, and trash icons for draw control
+function touchDrawRectHint(hasCorner) {
+  return hasCorner
+    ? "Tap to place the opposite corner"
+    : "Tap to place the first corner";
+}
+
+// Line segment, circle, rectangle, and trash icons for draw control
 const LINE_SEGMENT_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-line-icon"><circle cx="6" cy="18" r="1.5" fill="currentColor"/><circle cx="18" cy="6" r="1.5" fill="currentColor"/><line x1="6" y1="18" x2="18" y2="6"/></svg>';
 const CIRCLE_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-circle-icon"><circle cx="12" cy="12" r="9"/></svg>';
+const RECT_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-rect-icon"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>';
 const TRASH_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="leaflet-draw-trash-icon"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 
@@ -597,6 +605,11 @@ const DrawLineControl = L.Control.extend({
     drawBtn.id = this._mapId === 1 ? "drawBox1" : "drawBox2";
     drawBtn.title = "Draw lines";
     drawBtn.innerHTML = LINE_SEGMENT_ICON;
+    const rectBtn = L.DomUtil.create("button", "leaflet-draw-line-btn", toolBar);
+    rectBtn.type = "button";
+    rectBtn.id = this._mapId === 1 ? "rectBox1" : "rectBox2";
+    rectBtn.title = "Draw rectangle";
+    rectBtn.innerHTML = RECT_ICON;
     const circleBtn = L.DomUtil.create("button", "leaflet-draw-line-btn", toolBar);
     circleBtn.type = "button";
     circleBtn.id = this._mapId === 1 ? "circleBox1" : "circleBox2";
@@ -913,7 +926,7 @@ map2.on("geosearch/showlocation", function (e) {
   if (center) map2.setView(center, 13);
 });
 
-// Line and circle drawing (one polyline and one circle per map, encoded in URL fragment)
+// Line, circle, and rectangle drawing (encoded in URL fragment)
 const LINE_STYLE = { color: "#0088ff", weight: 4 };
 const LINE_BORDER_STYLE = { color: "white", weight: 8 };
 const POLYGON_FILL_STYLE = { fillColor: "#0088ff", fillOpacity: 0.2 };
@@ -929,6 +942,18 @@ const CIRCLE_BORDER_STYLE = {
   fillColor: "#0088ff",
   fillOpacity: 0.2,
 };
+const RECT_STYLE = {
+  color: "#0088ff",
+  weight: 4,
+  fillColor: "#0088ff",
+  fillOpacity: 0.2,
+};
+const RECT_BORDER_STYLE = {
+  color: "white",
+  weight: 8,
+  fillColor: "#0088ff",
+  fillOpacity: 0.2,
+};
 let line1 = null;
 let line2 = null;
 let line1Border = null;
@@ -937,6 +962,8 @@ let line1Fill = null;
 let line2Fill = null;
 let circles1 = [];
 let circles2 = [];
+let rects1 = [];
+let rects2 = [];
 
 // Drawing precision: 4 decimals (~11 m), keeps URLs small
 const COORD_PRECISION = 4;
@@ -965,11 +992,12 @@ function base64urlToBytes(str) {
   }
 }
 
-// Binary format: [magic=1, n1, n2, ...] or [magic=2, ..., 6 circle floats] or [magic=3, segments..., 6 circle floats] or [magic=4, segments..., n_c1, n_c2, circle floats]
+// Binary format: [magic=1, n1, n2, ...] or [magic=2, ..., 6 circle floats] or [magic=3, segments..., 6 circle floats] or [magic=4, segments..., n_c1, n_c2, circle floats] or [magic=5, segments..., n_c1, n_c2, circles..., n_r1, n_r2, rect corner floats (8 each)]
 const BINARY_MAGIC = 1;
 const BINARY_MAGIC_WITH_CIRCLES = 2;
 const BINARY_MAGIC_MULTI_SEGMENTS = 3;
 const BINARY_MAGIC_MULTI_CIRCLES = 4;
+const BINARY_MAGIC_WITH_RECTANGLES = 5;
 function normalizeCircleData(c) {
   if (!c) return [];
   return Array.isArray(c)
@@ -978,7 +1006,81 @@ function normalizeCircleData(c) {
       ? [c]
       : [];
 }
-function encodeDrawingBinary(line1Points, line2Points, circle1Data, circle2Data) {
+function pointToLatLngPair(p) {
+  if (!p) return null;
+  const lat = Array.isArray(p) ? p[0] : p.lat;
+  const lng = Array.isArray(p) ? p[1] : p.lng;
+  if (lat == null || lng == null) return null;
+  return [Number(lat), Number(lng)];
+}
+
+// Screen-axis-aligned rectangle from two opposite corners (ignores map bearing).
+function screenAlignedRectCorners(map, latlng1, latlng2) {
+  const p1 = map.latLngToContainerPoint(latlng1);
+  const p2 = map.latLngToContainerPoint(latlng2);
+  const minX = Math.min(p1.x, p2.x);
+  const maxX = Math.max(p1.x, p2.x);
+  const minY = Math.min(p1.y, p2.y);
+  const maxY = Math.max(p1.y, p2.y);
+  if (minX === maxX || minY === maxY) return null;
+  return [
+    map.containerPointToLatLng(L.point(minX, minY)),
+    map.containerPointToLatLng(L.point(maxX, minY)),
+    map.containerPointToLatLng(L.point(maxX, maxY)),
+    map.containerPointToLatLng(L.point(minX, maxY)),
+  ].map((ll) => [ll.lat, ll.lng]);
+}
+
+function normalizeRectData(r) {
+  if (!r) return [];
+  const list = Array.isArray(r) ? r : [r];
+  return list
+    .map((item) => {
+      if (!item) return null;
+      if (Array.isArray(item.corners) && item.corners.length >= 4) {
+        const corners = item.corners.slice(0, 4).map(pointToLatLngPair);
+        if (corners.some((c) => !c)) return null;
+        if (corners[0][0] === corners[2][0] && corners[0][1] === corners[2][1])
+          return null;
+        return { corners };
+      }
+      const bounds = item.bounds || item;
+      if (!Array.isArray(bounds) || bounds.length < 2) return null;
+      // Legacy 2-corner bounds → NSEW rectangle corners
+      if (bounds.length === 2) {
+        const a = pointToLatLngPair(bounds[0]);
+        const b = pointToLatLngPair(bounds[1]);
+        if (!a || !b || (a[0] === b[0] && a[1] === b[1])) return null;
+        const south = Math.min(a[0], b[0]);
+        const north = Math.max(a[0], b[0]);
+        const west = Math.min(a[1], b[1]);
+        const east = Math.max(a[1], b[1]);
+        return {
+          corners: [
+            [north, west],
+            [north, east],
+            [south, east],
+            [south, west],
+          ],
+        };
+      }
+      if (bounds.length >= 4) {
+        const corners = bounds.slice(0, 4).map(pointToLatLngPair);
+        if (corners.some((c) => !c)) return null;
+        return { corners };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+function encodeDrawingBinary(
+  line1Points,
+  line2Points,
+  circle1Data,
+  circle2Data,
+  rect1Data,
+  rect2Data
+) {
   const round = (pts) =>
     pts.map((ll) => [roundCoord(ll.lat ?? ll[0]), roundCoord(ll.lng ?? ll[1])]);
   const segs1 = toSegments(line1Points || []);
@@ -988,25 +1090,32 @@ function encodeDrawingBinary(line1Points, line2Points, circle1Data, circle2Data)
   const s2 = segs2.map(roundSeg).filter((s) => s.length >= 2);
   const c1Arr = normalizeCircleData(circle1Data);
   const c2Arr = normalizeCircleData(circle2Data);
+  const r1Arr = normalizeRectData(rect1Data);
+  const r2Arr = normalizeRectData(rect2Data);
   const hasCircles = c1Arr.length > 0 || c2Arr.length > 0;
+  const hasRects = r1Arr.length > 0 || r2Arr.length > 0;
   const useMultiCircle = c1Arr.length > 1 || c2Arr.length > 1;
-  if (s1.length === 0 && s2.length === 0 && !hasCircles) return null;
-  const circleFloats = useMultiCircle
-    ? 2 + 3 * (c1Arr.length + c2Arr.length)
-    : hasCircles
-      ? 6
-      : 0;
+  if (s1.length === 0 && s2.length === 0 && !hasCircles && !hasRects) return null;
+  const circleFloats =
+    hasRects || useMultiCircle
+      ? 2 + 3 * (c1Arr.length + c2Arr.length)
+      : hasCircles
+        ? 6
+        : 0;
+  const rectFloats = hasRects ? 2 + 8 * (r1Arr.length + r2Arr.length) : 0;
   const useMulti = s1.length > 1 || s2.length > 1;
   let fa;
   let i;
-  const magic = useMultiCircle
-    ? BINARY_MAGIC_MULTI_CIRCLES
-    : useMulti
-      ? BINARY_MAGIC_MULTI_SEGMENTS
-      : hasCircles
-        ? BINARY_MAGIC_WITH_CIRCLES
-        : BINARY_MAGIC;
-  if (useMulti || useMultiCircle) {
+  const magic = hasRects
+    ? BINARY_MAGIC_WITH_RECTANGLES
+    : useMultiCircle
+      ? BINARY_MAGIC_MULTI_CIRCLES
+      : useMulti
+        ? BINARY_MAGIC_MULTI_SEGMENTS
+        : hasCircles
+          ? BINARY_MAGIC_WITH_CIRCLES
+          : BINARY_MAGIC;
+  if (useMulti || useMultiCircle || hasRects) {
     const len =
       1 +
       2 +
@@ -1014,7 +1123,8 @@ function encodeDrawingBinary(line1Points, line2Points, circle1Data, circle2Data)
       s2.length +
       s1.reduce((n, seg) => n + seg.length * 2, 0) +
       s2.reduce((n, seg) => n + seg.length * 2, 0) +
-      circleFloats;
+      circleFloats +
+      rectFloats;
     fa = new Float32Array(len);
     i = 0;
     fa[i++] = magic;
@@ -1053,27 +1163,41 @@ function encodeDrawingBinary(line1Points, line2Points, circle1Data, circle2Data)
       fa[i++] = lng;
     }
   }
-  if (hasCircles) {
-    if (useMultiCircle) {
-      fa[i++] = c1Arr.length;
-      fa[i++] = c2Arr.length;
-      for (const c of c1Arr) {
-        fa[i++] = roundCoord(c.center[0]);
-        fa[i++] = roundCoord(c.center[1]);
-        fa[i++] = c.radius;
+  if (hasRects || useMultiCircle) {
+    fa[i++] = c1Arr.length;
+    fa[i++] = c2Arr.length;
+    for (const c of c1Arr) {
+      fa[i++] = roundCoord(c.center[0]);
+      fa[i++] = roundCoord(c.center[1]);
+      fa[i++] = c.radius;
+    }
+    for (const c of c2Arr) {
+      fa[i++] = roundCoord(c.center[0]);
+      fa[i++] = roundCoord(c.center[1]);
+      fa[i++] = c.radius;
+    }
+  } else if (hasCircles) {
+    fa[i++] = c1Arr[0] ? roundCoord(c1Arr[0].center[0]) : 0;
+    fa[i++] = c1Arr[0] ? roundCoord(c1Arr[0].center[1]) : 0;
+    fa[i++] = c1Arr[0] ? c1Arr[0].radius : 0;
+    fa[i++] = c2Arr[0] ? roundCoord(c2Arr[0].center[0]) : 0;
+    fa[i++] = c2Arr[0] ? roundCoord(c2Arr[0].center[1]) : 0;
+    fa[i++] = c2Arr[0] ? c2Arr[0].radius : 0;
+  }
+  if (hasRects) {
+    fa[i++] = r1Arr.length;
+    fa[i++] = r2Arr.length;
+    for (const r of r1Arr) {
+      for (const [lat, lng] of r.corners) {
+        fa[i++] = roundCoord(lat);
+        fa[i++] = roundCoord(lng);
       }
-      for (const c of c2Arr) {
-        fa[i++] = roundCoord(c.center[0]);
-        fa[i++] = roundCoord(c.center[1]);
-        fa[i++] = c.radius;
+    }
+    for (const r of r2Arr) {
+      for (const [lat, lng] of r.corners) {
+        fa[i++] = roundCoord(lat);
+        fa[i++] = roundCoord(lng);
       }
-    } else {
-      fa[i++] = c1Arr[0] ? roundCoord(c1Arr[0].center[0]) : 0;
-      fa[i++] = c1Arr[0] ? roundCoord(c1Arr[0].center[1]) : 0;
-      fa[i++] = c1Arr[0] ? c1Arr[0].radius : 0;
-      fa[i++] = c2Arr[0] ? roundCoord(c2Arr[0].center[0]) : 0;
-      fa[i++] = c2Arr[0] ? roundCoord(c2Arr[0].center[1]) : 0;
-      fa[i++] = c2Arr[0] ? c2Arr[0].radius : 0;
     }
   }
   return base64urlFromBytes(new Uint8Array(fa.buffer));
@@ -1088,8 +1212,14 @@ function decodeDrawingBinary(bytes) {
   let line2 = null;
   let circle1 = null;
   let circle2 = null;
+  let rect1 = null;
+  let rect2 = null;
   let i = 3;
-  if (magic === BINARY_MAGIC_MULTI_SEGMENTS || magic === BINARY_MAGIC_MULTI_CIRCLES) {
+  if (
+    magic === BINARY_MAGIC_MULTI_SEGMENTS ||
+    magic === BINARY_MAGIC_MULTI_CIRCLES ||
+    magic === BINARY_MAGIC_WITH_RECTANGLES
+  ) {
     const nSeg1 = Math.min(Math.max(0, fa[1] | 0), 100);
     const nSeg2 = Math.min(Math.max(0, fa[2] | 0), 100);
     const segs1 = [];
@@ -1132,7 +1262,10 @@ function decodeDrawingBinary(bytes) {
   } else {
     return null;
   }
-  if (magic === BINARY_MAGIC_MULTI_CIRCLES && i + 2 <= fa.length) {
+  if (
+    (magic === BINARY_MAGIC_MULTI_CIRCLES || magic === BINARY_MAGIC_WITH_RECTANGLES) &&
+    i + 2 <= fa.length
+  ) {
     const nC1 = Math.min(Math.max(0, fa[i++] | 0), 50);
     const nC2 = Math.min(Math.max(0, fa[i++] | 0), 50);
     const circ1 = [];
@@ -1153,8 +1286,39 @@ function decodeDrawingBinary(bytes) {
   ) {
     if (fa[i + 2] > 0) circle1 = { center: [fa[i], fa[i + 1]], radius: fa[i + 2] };
     if (fa[i + 5] > 0) circle2 = { center: [fa[i + 3], fa[i + 4]], radius: fa[i + 5] };
+    i += 6;
   }
-  return { line1, line2, circle1, circle2 };
+  if (magic === BINARY_MAGIC_WITH_RECTANGLES && i + 2 <= fa.length) {
+    const nR1 = Math.min(Math.max(0, fa[i++] | 0), 50);
+    const nR2 = Math.min(Math.max(0, fa[i++] | 0), 50);
+    const rectsA = [];
+    for (let k = 0; k < nR1 && i + 7 < fa.length; k++) {
+      rectsA.push({
+        corners: [
+          [fa[i], fa[i + 1]],
+          [fa[i + 2], fa[i + 3]],
+          [fa[i + 4], fa[i + 5]],
+          [fa[i + 6], fa[i + 7]],
+        ],
+      });
+      i += 8;
+    }
+    const rectsB = [];
+    for (let k = 0; k < nR2 && i + 7 < fa.length; k++) {
+      rectsB.push({
+        corners: [
+          [fa[i], fa[i + 1]],
+          [fa[i + 2], fa[i + 3]],
+          [fa[i + 4], fa[i + 5]],
+          [fa[i + 6], fa[i + 7]],
+        ],
+      });
+      i += 8;
+    }
+    rect1 = rectsA.length ? rectsA : null;
+    rect2 = rectsB.length ? rectsB : null;
+  }
+  return { line1, line2, circle1, circle2, rect1, rect2 };
 }
 
 function pointsFromFragment(payload) {
@@ -1192,13 +1356,24 @@ function parseFragmentLegacy(params) {
   return { line1: parseCSV(v1), line2: parseCSV(v2) };
 }
 
+function emptyDrawing() {
+  return {
+    line1: null,
+    line2: null,
+    circle1: null,
+    circle2: null,
+    rect1: null,
+    rect2: null,
+  };
+}
+
 function parseFragment() {
   const raw = window.location.hash.slice(1).trim();
-  if (!raw) return { line1: null, line2: null, circle1: null, circle2: null };
+  if (!raw) return emptyDrawing();
   const bytes = base64urlToBytes(raw);
   if (bytes && bytes.length >= 4) {
     const binary = decodeDrawingBinary(bytes);
-    if (binary) return binary;
+    if (binary) return { ...emptyDrawing(), ...binary };
   }
   if (bytes) {
     try {
@@ -1209,24 +1384,50 @@ function parseFragment() {
         line2: pointsFromFragment(data[2] ?? data.line2),
         circle1: data.circle1 && data.circle1.radius > 0 ? data.circle1 : null,
         circle2: data.circle2 && data.circle2.radius > 0 ? data.circle2 : null,
+        rect1: normalizeRectData(data.rect1).length
+          ? normalizeRectData(data.rect1)
+          : null,
+        rect2: normalizeRectData(data.rect2).length
+          ? normalizeRectData(data.rect2)
+          : null,
       };
     } catch (_) {}
   }
   const legacy = parseFragmentLegacy(new URLSearchParams(raw));
-  if (legacy) return { ...legacy, circle1: null, circle2: null };
-  return { line1: null, line2: null, circle1: null, circle2: null };
+  if (legacy) return { ...emptyDrawing(), ...legacy };
+  return emptyDrawing();
 }
 
-function updateFragment(line1Points, line2Points, circle1Data, circle2Data) {
+function updateFragment(
+  line1Points,
+  line2Points,
+  circle1Data,
+  circle2Data,
+  rect1Data,
+  rect2Data
+) {
   dismissCopiedState();
   const encoded = encodeDrawingBinary(
     line1Points,
     line2Points,
     circle1Data ?? null,
-    circle2Data ?? null
+    circle2Data ?? null,
+    rect1Data ?? null,
+    rect2Data ?? null
   );
   const hash = encoded ? "#" + encoded : "";
   history.pushState(null, "", window.location.pathname + window.location.search + hash);
+}
+
+function syncDrawingFragment(overrides) {
+  updateFragment(
+    overrides?.line1 !== undefined ? overrides.line1 : getLinePoints(line1),
+    overrides?.line2 !== undefined ? overrides.line2 : getLinePoints(line2),
+    overrides?.circle1 !== undefined ? overrides.circle1 : getCirclesData(circles1),
+    overrides?.circle2 !== undefined ? overrides.circle2 : getCirclesData(circles2),
+    overrides?.rect1 !== undefined ? overrides.rect1 : getRectanglesData(rects1),
+    overrides?.rect2 !== undefined ? overrides.rect2 : getRectanglesData(rects2)
+  );
 }
 
 function toSegments(data) {
@@ -1364,6 +1565,36 @@ function setCircles(map, circleVar, circlesData) {
   }
 }
 
+function getRectanglesData(rectsLayers) {
+  if (!rectsLayers || !rectsLayers.length) return [];
+  return rectsLayers.map(({ layer }) => {
+    const latlngs = layer.getLatLngs();
+    const ring = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+    return {
+      corners: ring
+        .slice(0, 4)
+        .map((ll) => (Array.isArray(ll) ? [ll[0], ll[1]] : [ll.lat, ll.lng])),
+    };
+  });
+}
+
+function setRectangles(map, rectVar, rectsData) {
+  const arr = rectVar === "rect1" ? rects1 : rects2;
+  for (const { borderLayer, layer } of arr) {
+    map.removeLayer(borderLayer);
+    map.removeLayer(layer);
+  }
+  arr.length = 0;
+  if (!rectsData || !rectsData.length) return;
+  const list = rectVar === "rect1" ? rects1 : rects2;
+  for (const item of normalizeRectData(rectsData)) {
+    const latlngs = item.corners.map((c) => L.latLng(c[0], c[1]));
+    const borderLayer = L.polygon(latlngs, { ...RECT_BORDER_STYLE }).addTo(map);
+    const layer = L.polygon(latlngs, { ...RECT_STYLE }).addTo(map);
+    list.push({ borderLayer, layer });
+  }
+}
+
 let toastTimeout = null;
 
 function showToast(message, type, durationMs) {
@@ -1392,10 +1623,27 @@ function dismissToast() {
 
 function applyFragmentToMaps() {
   const raw = window.location.hash.slice(1).trim();
-  const { line1: pts1, line2: pts2, circle1: circ1, circle2: circ2 } = parseFragment();
+  const {
+    line1: pts1,
+    line2: pts2,
+    circle1: circ1,
+    circle2: circ2,
+    rect1: r1,
+    rect2: r2,
+  } = parseFragment();
   const hasCirc1 = Array.isArray(circ1) ? circ1.length > 0 : !!circ1;
   const hasCirc2 = Array.isArray(circ2) ? circ2.length > 0 : !!circ2;
-  if (raw && !pts1 && !pts2 && !hasCirc1 && !hasCirc2) {
+  const rect1Arr = normalizeRectData(r1);
+  const rect2Arr = normalizeRectData(r2);
+  if (
+    raw &&
+    !pts1 &&
+    !pts2 &&
+    !hasCirc1 &&
+    !hasCirc2 &&
+    !rect1Arr.length &&
+    !rect2Arr.length
+  ) {
     showToast("Invalid map annotations.", "error");
     history.replaceState(null, "", window.location.pathname + window.location.search);
     return;
@@ -1422,31 +1670,41 @@ function applyFragmentToMaps() {
   const circ2Arr = Array.isArray(circ2) ? circ2 : circ2 ? [circ2] : [];
   setCircles(map1, "circle1", circ1Arr);
   setCircles(map2, "circle2", circ2Arr);
+  setRectangles(map1, "rect1", rect1Arr);
+  setRectangles(map2, "rect2", rect2Arr);
   updateClearButtons();
 }
 
 let lastCompletedShapeMapId = null;
 
-let drawState = {
-  mapId: null,
-  tool: "line",
-  points: [],
-  previewBorderLayer: null,
-  previewLayer: null,
-  segmentPreviewBorderLayer: null,
-  segmentPreviewLayer: null,
-  connectionPreviewBorderLayer: null,
-  connectionPreviewLayer: null,
-  closePulseMarker: null,
-  closeIndicatorLayer: null,
-  touchPendingMarker: null,
-  lastTapAt: 0,
-  acceptingTap: false,
-  startedAfterCompletedShape: false,
-  circleCenter: null,
-  circlePreviewLayer: null,
-  circlePreviewBorderLayer: null,
-};
+function emptyDrawState(overrides) {
+  return {
+    mapId: null,
+    tool: "line",
+    points: [],
+    previewBorderLayer: null,
+    previewLayer: null,
+    segmentPreviewBorderLayer: null,
+    segmentPreviewLayer: null,
+    connectionPreviewBorderLayer: null,
+    connectionPreviewLayer: null,
+    closePulseMarker: null,
+    closeIndicatorLayer: null,
+    touchPendingMarker: null,
+    lastTapAt: 0,
+    acceptingTap: false,
+    startedAfterCompletedShape: false,
+    circleCenter: null,
+    circlePreviewLayer: null,
+    circlePreviewBorderLayer: null,
+    rectCorner: null,
+    rectPreviewLayer: null,
+    rectPreviewBorderLayer: null,
+    ...overrides,
+  };
+}
+
+let drawState = emptyDrawState();
 
 function removeTouchPendingIndicator(map) {
   if (drawState.touchPendingMarker) {
@@ -1476,6 +1734,10 @@ function syncTouchPendingIndicator(map) {
   }
   if (drawState.tool === "circle" && drawState.circleCenter) {
     updateTouchPendingIndicator(map, drawState.circleCenter);
+    return;
+  }
+  if (drawState.tool === "rect" && drawState.rectCorner) {
+    updateTouchPendingIndicator(map, drawState.rectCorner);
     return;
   }
   removeTouchPendingIndicator(map);
@@ -1559,6 +1821,15 @@ function shouldAcceptDrawTap(e, map) {
       return false;
     }
   }
+  if (drawState.tool === "rect" && drawState.rectCorner) {
+    const p0 = map.latLngToContainerPoint(drawState.rectCorner);
+    const p1 = map.latLngToContainerPoint(e.latlng);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    if (dx * dx + dy * dy < MIN_TAP_DISTANCE_PX * MIN_TAP_DISTANCE_PX) {
+      return false;
+    }
+  }
   drawState.lastTapAt = now;
   return true;
 }
@@ -1585,6 +1856,16 @@ function processDrawTap(e, mapId) {
       finishCircleDraw(mapId, drawState.circleCenter, radius);
       return;
     }
+    if (drawState.tool === "rect") {
+      if (!drawState.rectCorner) {
+        drawState.rectCorner = e.latlng;
+        syncDrawIndicators(map);
+        showTouchDrawToast(touchDrawRectHint(true));
+        return;
+      }
+      finishRectDraw(mapId, drawState.rectCorner, e.latlng);
+      return;
+    }
     if (drawState.points.length >= 2) {
       const first = drawState.points[0];
       const p0 = map.latLngToContainerPoint(first);
@@ -1606,47 +1887,52 @@ function processDrawTap(e, mapId) {
   }
 }
 
+function setDrawToolActive(mapId, tool) {
+  document
+    .getElementById("drawBox1")
+    .classList.toggle("active", mapId === 1 && tool === "line");
+  document
+    .getElementById("drawBox2")
+    .classList.toggle("active", mapId === 2 && tool === "line");
+  document
+    .getElementById("circleBox1")
+    .classList.toggle("active", mapId === 1 && tool === "circle");
+  document
+    .getElementById("circleBox2")
+    .classList.toggle("active", mapId === 2 && tool === "circle");
+  document
+    .getElementById("rectBox1")
+    .classList.toggle("active", mapId === 1 && tool === "rect");
+  document
+    .getElementById("rectBox2")
+    .classList.toggle("active", mapId === 2 && tool === "rect");
+}
+
+function clearDrawToolActive() {
+  document.getElementById("drawBox1").classList.remove("active");
+  document.getElementById("drawBox2").classList.remove("active");
+  document.getElementById("circleBox1").classList.remove("active");
+  document.getElementById("circleBox2").classList.remove("active");
+  document.getElementById("rectBox1").classList.remove("active");
+  document.getElementById("rectBox2").classList.remove("active");
+}
+
 function startDraw(mapId, tool) {
   const t = tool || "line";
   const startedAfterCompletedShape = t === "line" && lastCompletedShapeMapId === mapId;
   if (startedAfterCompletedShape) lastCompletedShapeMapId = null;
-  drawState = {
+  drawState = emptyDrawState({
     mapId,
     tool: t,
-    points: [],
-    previewBorderLayer: null,
-    previewLayer: null,
-    segmentPreviewBorderLayer: null,
-    segmentPreviewLayer: null,
-    connectionPreviewBorderLayer: null,
-    connectionPreviewLayer: null,
-    closePulseMarker: null,
-    closeIndicatorLayer: null,
-    touchPendingMarker: null,
-    lastTapAt: 0,
-    acceptingTap: false,
     startedAfterCompletedShape,
-    circleCenter: null,
-    circlePreviewLayer: null,
-    circlePreviewBorderLayer: null,
-  };
-  document
-    .getElementById("drawBox1")
-    .classList.toggle("active", mapId === 1 && t === "line");
-  document
-    .getElementById("drawBox2")
-    .classList.toggle("active", mapId === 2 && t === "line");
-  document
-    .getElementById("circleBox1")
-    .classList.toggle("active", mapId === 1 && t === "circle");
-  document
-    .getElementById("circleBox2")
-    .classList.toggle("active", mapId === 2 && t === "circle");
+  });
+  setDrawToolActive(mapId, t);
   document.getElementById("wrapper1").classList.toggle("draw-mode", mapId === 1);
   document.getElementById("wrapper2").classList.toggle("draw-mode", mapId === 2);
   if (isTouchDrawDevice()) {
     if (t === "line") showTouchDrawToast(touchDrawLineHint(0));
     else if (t === "circle") showTouchDrawToast(touchDrawCircleHint(false));
+    else if (t === "rect") showTouchDrawToast(touchDrawRectHint(false));
   }
   setMapDrawInteraction(mapId, true);
 }
@@ -1690,6 +1976,17 @@ function removeCirclePreview(map) {
   }
 }
 
+function removeRectPreview(map) {
+  if (drawState.rectPreviewBorderLayer) {
+    map.removeLayer(drawState.rectPreviewBorderLayer);
+    drawState.rectPreviewBorderLayer = null;
+  }
+  if (drawState.rectPreviewLayer) {
+    map.removeLayer(drawState.rectPreviewLayer);
+    drawState.rectPreviewLayer = null;
+  }
+}
+
 function cancelDraw() {
   const mapId = drawState.mapId;
   const map = mapId === 1 ? map1 : map2;
@@ -1701,31 +1998,10 @@ function cancelDraw() {
   if (drawState.mapId) {
     removeTouchPendingIndicator(map);
     removeCirclePreview(map);
+    removeRectPreview(map);
   }
-  drawState = {
-    mapId: null,
-    tool: "line",
-    points: [],
-    previewBorderLayer: null,
-    previewLayer: null,
-    segmentPreviewBorderLayer: null,
-    segmentPreviewLayer: null,
-    connectionPreviewBorderLayer: null,
-    connectionPreviewLayer: null,
-    closePulseMarker: null,
-    closeIndicatorLayer: null,
-    touchPendingMarker: null,
-    lastTapAt: 0,
-    acceptingTap: false,
-    startedAfterCompletedShape: false,
-    circleCenter: null,
-    circlePreviewLayer: null,
-    circlePreviewBorderLayer: null,
-  };
-  document.getElementById("drawBox1").classList.remove("active");
-  document.getElementById("drawBox2").classList.remove("active");
-  document.getElementById("circleBox1").classList.remove("active");
-  document.getElementById("circleBox2").classList.remove("active");
+  drawState = emptyDrawState();
+  clearDrawToolActive();
   document.getElementById("wrapper1").classList.remove("draw-mode");
   document.getElementById("wrapper2").classList.remove("draw-mode");
   setMapDrawInteraction(mapId, false);
@@ -1781,21 +2057,10 @@ function finishDraw(mapId) {
   removeTouchPendingIndicator(map);
   if (mapId === 1) {
     setLine(map1, "line1", result);
-    updateFragment(
-      getLinePoints(line1),
-      getLinePoints(line2),
-      getCirclesData(circles1),
-      getCirclesData(circles2)
-    );
   } else {
     setLine(map2, "line2", result);
-    updateFragment(
-      getLinePoints(line1),
-      getLinePoints(line2),
-      getCirclesData(circles1),
-      getCirclesData(circles2)
-    );
   }
+  syncDrawingFragment();
   lastCompletedShapeMapId = mapId;
   exitDrawMode();
 }
@@ -1809,12 +2074,22 @@ function finishCircleDraw(mapId, center, radius) {
     ...existing,
     { center: [center.lat, center.lng], radius },
   ]);
-  updateFragment(
-    getLinePoints(line1),
-    getLinePoints(line2),
-    getCirclesData(circles1),
-    getCirclesData(circles2)
-  );
+  syncDrawingFragment();
+  exitDrawMode();
+}
+
+function finishRectDraw(mapId, corner1, corner2) {
+  const map = mapId === 1 ? map1 : map2;
+  removeRectPreview(map);
+  const corners = screenAlignedRectCorners(map, corner1, corner2);
+  if (!corners) {
+    cancelDraw();
+    return;
+  }
+  const existing = mapId === 1 ? getRectanglesData(rects1) : getRectanglesData(rects2);
+  const rectVar = mapId === 1 ? "rect1" : "rect2";
+  setRectangles(map, rectVar, [...existing, { corners }]);
+  syncDrawingFragment();
   exitDrawMode();
 }
 
@@ -1824,30 +2099,8 @@ function exitDrawMode() {
   if (map) removeTouchPendingIndicator(map);
   setMapDrawInteraction(mapId, false);
   if (isTouchDrawDevice()) dismissToast();
-  drawState = {
-    mapId: null,
-    tool: "line",
-    points: [],
-    previewBorderLayer: null,
-    previewLayer: null,
-    segmentPreviewBorderLayer: null,
-    segmentPreviewLayer: null,
-    connectionPreviewBorderLayer: null,
-    connectionPreviewLayer: null,
-    closePulseMarker: null,
-    closeIndicatorLayer: null,
-    touchPendingMarker: null,
-    lastTapAt: 0,
-    acceptingTap: false,
-    startedAfterCompletedShape: false,
-    circleCenter: null,
-    circlePreviewLayer: null,
-    circlePreviewBorderLayer: null,
-  };
-  document.getElementById("drawBox1").classList.remove("active");
-  document.getElementById("drawBox2").classList.remove("active");
-  document.getElementById("circleBox1").classList.remove("active");
-  document.getElementById("circleBox2").classList.remove("active");
+  drawState = emptyDrawState();
+  clearDrawToolActive();
   document.getElementById("wrapper1").classList.remove("draw-mode");
   document.getElementById("wrapper2").classList.remove("draw-mode");
   updateClearButtons();
@@ -1869,7 +2122,7 @@ document.addEventListener(
       return;
     }
     if (e.key !== "Escape" || !drawState.mapId) return;
-    if (drawState.tool === "circle") {
+    if (drawState.tool === "circle" || drawState.tool === "rect") {
       cancelDraw();
       return;
     }
@@ -1902,6 +2155,18 @@ document.getElementById("circleBox2").addEventListener("click", function () {
     else startDraw(2, "circle");
   } else startDraw(2, "circle");
 });
+document.getElementById("rectBox1").addEventListener("click", function () {
+  if (drawState.mapId === 1) {
+    if (drawState.tool === "rect") cancelDraw();
+    else startDraw(1, "rect");
+  } else startDraw(1, "rect");
+});
+document.getElementById("rectBox2").addEventListener("click", function () {
+  if (drawState.mapId === 2) {
+    if (drawState.tool === "rect") cancelDraw();
+    else startDraw(2, "rect");
+  } else startDraw(2, "rect");
+});
 
 function onMapMouseMove(e, mapId) {
   if (drawState.mapId !== mapId) return;
@@ -1921,6 +2186,27 @@ function onMapMouseMove(e, mapId) {
       drawState.circlePreviewLayer = L.circle(drawState.circleCenter, {
         radius,
         ...CIRCLE_STYLE,
+        dashArray: "5,5",
+        className: "leaflet-draw-animated-dash",
+      }).addTo(map);
+    }
+    return;
+  }
+  if (drawState.tool === "rect" && drawState.rectCorner) {
+    const corners = screenAlignedRectCorners(map, drawState.rectCorner, e.latlng);
+    if (!corners) return;
+    const latlngs = corners.map((c) => L.latLng(c[0], c[1]));
+    if (drawState.rectPreviewLayer) {
+      drawState.rectPreviewBorderLayer.setLatLngs(latlngs);
+      drawState.rectPreviewLayer.setLatLngs(latlngs);
+    } else {
+      drawState.rectPreviewBorderLayer = L.polygon(latlngs, {
+        ...RECT_BORDER_STYLE,
+        dashArray: "5,5",
+        className: "leaflet-draw-animated-dash",
+      }).addTo(map);
+      drawState.rectPreviewLayer = L.polygon(latlngs, {
+        ...RECT_STYLE,
         dashArray: "5,5",
         className: "leaflet-draw-animated-dash",
       }).addTo(map);
@@ -2026,6 +2312,7 @@ function onMapMouseOut(e, mapId) {
   removeDesktopCloseIndicator(map);
   removeCloseHoverState();
   removeCirclePreview(map);
+  removeRectPreview(map);
 }
 
 function onMapClick(e, mapId) {
@@ -2037,6 +2324,7 @@ function onMapClick(e, mapId) {
 function onMapDblClick(e, mapId) {
   if (drawState.mapId !== mapId) return;
   if (isTouchDrawDevice()) return;
+  if (drawState.tool !== "line") return;
   L.DomEvent.stopPropagation(e);
   L.DomEvent.preventDefault(e);
   finishDraw(mapId);
@@ -2053,9 +2341,9 @@ map2.on("dblclick", (e) => onMapDblClick(e, 2));
 
 function updateClearButtons() {
   document.getElementById("clearBar1").style.display =
-    line1 || circles1.length ? "" : "none";
+    line1 || circles1.length || rects1.length ? "" : "none";
   document.getElementById("clearBar2").style.display =
-    line2 || circles2.length ? "" : "none";
+    line2 || circles2.length || rects2.length ? "" : "none";
 }
 
 document.getElementById("clearBox1").addEventListener("click", function () {
@@ -2074,8 +2362,12 @@ document.getElementById("clearBox1").addEventListener("click", function () {
     setCircles(map1, "circle1", []);
     changed = true;
   }
+  if (rects1.length) {
+    setRectangles(map1, "rect1", []);
+    changed = true;
+  }
   if (changed) {
-    updateFragment(null, getLinePoints(line2), null, getCirclesData(circles2));
+    syncDrawingFragment({ line1: null, circle1: null, rect1: null });
     updateClearButtons();
   }
 });
@@ -2095,8 +2387,12 @@ document.getElementById("clearBox2").addEventListener("click", function () {
     setCircles(map2, "circle2", []);
     changed = true;
   }
+  if (rects2.length) {
+    setRectangles(map2, "rect2", []);
+    changed = true;
+  }
   if (changed) {
-    updateFragment(getLinePoints(line1), null, getCirclesData(circles1), null);
+    syncDrawingFragment({ line2: null, circle2: null, rect2: null });
     updateClearButtons();
   }
 });
