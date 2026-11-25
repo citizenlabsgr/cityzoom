@@ -1,7 +1,7 @@
 [
   {
     "name": "Disneyland vs. Disney World",
-    "url": "https://cityzoom.link/?zoom=16&lat1=33.81229&lon1=-117.91858&lat2=28.4194&lon2=-81.5803"
+    "url": "https://cityzoom.link/?zoom=16&lat1=33.81239&lon1=-117.91874&lat2=28.41960&lon2=-81.58153&rot2=0.2"
   },
   {
     "name": "Michigan's Adventure vs. Cedar Point",
@@ -9,15 +9,15 @@
   },
   {
     "name": "Chicago Loop vs. Detroit People Mover",
-    "url": "https://cityzoom.link/?zoom=15&lat1=41.88093&lon1=-87.62925&lat2=42.33036&lon2=-83.04713"
+    "url": "https://cityzoom.link/?zoom=15&lat1=41.88106&lon1=-87.62972&lat2=42.33211&lon2=-83.04788&rot1=1&rot2=27.5"
   },
   {
     "name": "SoFi Stadium vs. Ford Field",
-    "url": "https://cityzoom.link/?zoom=16&lat1=33.95089&lon1=-118.33849&lat2=42.33994&lon2=-83.04555"
+    "url": "https://cityzoom.link/?zoom=16&lat1=33.95095&lon1=-118.33774&lat2=42.33999&lon2=-83.04525&rot1=0.1&rot2=25.1"
   },
   {
     "name": "Dodger Stadium vs. Comerica Park",
-    "url": "https://cityzoom.link/?zoom=16&lat1=34.07413&lon1=-118.24072&lat2=42.33954&lon2=-83.04922"
+    "url": "https://cityzoom.link/?zoom=16&lat1=34.07309&lon1=-118.24133&lat2=42.33901&lon2=-83.04801&rot1=334.8&rot2=25.8"
   },
   {
     "name": "I-96/I-696/M-5 Interchange vs. I-96/US-131 Interchange",
